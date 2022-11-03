@@ -5,7 +5,6 @@ from typing import Dict
 
 import git
 from prefect import flow, get_run_logger, task
-from prefect.blocks.system import String
 from prefect_dask import DaskTaskRunner
 from sbem.experiment.Experiment import Experiment
 from sbem.experiment.parse_utils import parse_and_add_sections
@@ -76,10 +75,6 @@ def commit_changes(exp: Experiment, name: str):
         repo.index.commit(f"Add sections to sample '{name}'.", author=exp._git_author)
 
 
-async def get_prologue():
-    return await String.load("log-slurm-job").value
-
-
 @flow(
     name="Add Sections",
     task_runner=DaskTaskRunner(
@@ -90,7 +85,9 @@ async def get_prologue():
             "memory": "12 GB",
             "walltime": "01:00:00",
             "worker_extra_args": ["--lifetime", "55m", "--lifetime-stagger", "5m"],
-            "job_script_prologue": [get_prologue()],
+            "job_script_prologue": [
+                "conda run -p /tungstenfs/scratch/gmicro_share/_prefect/miniconda3/envs/airtable python /tungstenfs/scratch/gmicro_share/_prefect/airtable/log-slurm-job.py --config /tungstenfs/scratch/gmicro/_prefect/airtable/slurm-job-log.ini"
+            ],
         },
         adapt_kwargs={
             "minimum": 1,
