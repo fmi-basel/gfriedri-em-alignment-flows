@@ -1,0 +1,4 @@
+em_alignment @ https://github.com/fmi-basel/gfriedri-em-alignment.git@main
+prefect
+prefect-dask
+dask-jobqueue
