@@ -79,7 +79,7 @@ async def get_prologue():
             "job_script_prologue": [get_prologue()],
         },
         adapt_kwargs={
-            "minimum": 0,
+            "minimum": 1,
             "maximum": 1,
         },
     ),
