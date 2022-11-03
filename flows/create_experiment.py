@@ -83,7 +83,7 @@ def commit_changes(exp: Experiment):
 )
 def create_experiment_flow(
     name: str = "experiment",
-    description: str = "Experiment to answer " "questions.",
+    description: str = "Experiment to answer questions.",
     root_dir: str = "/tungstenfs/scratch/gmicro_sem",
     persist_result=False,
 ):
