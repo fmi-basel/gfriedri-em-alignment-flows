@@ -5,7 +5,6 @@ from os.path import exists, join
 from typing import Dict
 
 import git
-from prefect.blocks.system import String
 from prefect.flows import flow
 from prefect.logging import get_run_logger
 from prefect.tasks import task
@@ -62,10 +61,6 @@ def commit_changes(exp: Experiment):
         repo.index.commit("Create experiment.", author=exp._git_author)
 
 
-async def get_prologue():
-    return await String.load("log-slurm-job").value
-
-
 @flow(
     name="Create Experiment",
     task_runner=DaskTaskRunner(
@@ -76,7 +71,9 @@ async def get_prologue():
             "memory": "2 GB",
             "walltime": "00:10:00",
             "worker_extra_args": ["--lifetime", "8m", "--lifetime-stagger", "2m"],
-            "job_script_prologue": [get_prologue()],
+            "job_script_prologue": [
+                "conda run -p /tungstenfs/scratch/gmicro_share/_prefect/miniconda3/envs/airtable python /tungstenfs/scratch/gmicro_share/_prefect/airtable/log-slurm-job.py --config /tungstenfs/scratch/gmicro/_prefect/airtable/slurm-job-log.ini"
+            ],
         },
         adapt_kwargs={
             "minimum": 1,
