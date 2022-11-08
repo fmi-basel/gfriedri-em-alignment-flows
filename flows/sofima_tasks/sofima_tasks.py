@@ -1,7 +1,7 @@
 from os.path import join
 
 import prefect
-from prefect import task
+from prefect import get_run_logger, task
 from sbem.experiment.Experiment import Experiment
 from sbem.record.Section import Section
 from sbem.tile_stitching.sofima_utils import (
@@ -11,7 +11,7 @@ from sbem.tile_stitching.sofima_utils import (
 from sofima import mesh
 
 
-@task(persist_result=True)
+@task(persist_result=False)
 def run_sofima(
     section: Section,
     stride: int,
@@ -29,10 +29,7 @@ def run_sofima(
     reconcile_flow_max_deviation: float = -1,
     integration_config: mesh.IntegrationConfig = default_mesh_integration_config(),
 ):
-    # logger = get_run_logger()
-    from prefect.logging import get_logger
-
-    logger = get_logger("sofima.alignment")
+    logger = get_run_logger()
     sec_long_name = join(
         section.get_sample().get_experiment().get_name(),
         section.get_sample().get_name(),
@@ -120,7 +117,7 @@ def load_sections_task(exp: Experiment, sample_name: str, tile_grid_num: int):
     return load_sections(exp=exp, sample_name=sample_name, tile_grid_num=tile_grid_num)
 
 
-@task(persist_result=True)
+@task()
 def build_integration_config(
     dt,
     gamma,

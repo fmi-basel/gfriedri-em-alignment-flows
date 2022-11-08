@@ -14,18 +14,31 @@ from utils.system import save_system_information
 from flows.sofima_tasks.sofima_tasks import build_integration_config, run_sofima
 
 
-@task(persist_result=True)
+@task(persist_result=False)
 def load_experiment(path: str):
     return Experiment.load(path=path)
 
 
-@task(persist_result=True)
+@task(persist_result=False)
 def get_sections(
-    exp: Experiment, sample_name: str, acquisition: str, tile_grid_num: int
+    exp: Experiment,
+    sample_name: str,
+    acquisition: str,
+    tile_grid_num: int,
+    start_section_num: int,
+    end_section_num: int,
 ):
-    return exp.get_sample(sample_name).get_sections_of_acquisition(
-        acquisition=acquisition, tile_grid_num=tile_grid_num, include_skipped=False
-    )
+    if start_section_num is not None and end_section_num is not None:
+        return exp.get_sample(sample_name).get_section_range(
+            start_section_num=start_section_num,
+            end_section_num=end_section_num,
+            tile_grid_num=tile_grid_num,
+            include_skipped=False,
+        )
+    else:
+        return exp.get_sample(sample_name).get_sections_of_acquisition(
+            acquisition=acquisition, tile_grid_num=tile_grid_num, include_skipped=False
+        )
 
 
 @task()
@@ -68,7 +81,7 @@ def log_sections_without_mesh(sections: List[Section]):
         "tile-registration-errors",
     )
     makedirs(path, exist_ok=True)
-    with open(file_name, "w") as f:
+    with open(join(path, file_name), "w") as f:
         json.dump(names, f, indent=4)
 
 
@@ -80,12 +93,13 @@ def log_sections_without_mesh(sections: List[Section]):
             "account": "dlthings",
             "cores": 4,
             "processes": 1,
-            "memory": "32 GB",
+            "memory": "12 GB",
             "walltime": "06:00:00",
             "job_extra_directives": [
-                "--partition=gpu_short",
-                "--gres=gpu:a40:1",
+                "--gpus-per-node=1",
+                "--cluster-constraint=gpuram32gb",
                 "--ntasks=1",
+                "--output=/tungstenfs/scratch/gmicro_share/_prefect/slurm/gfriedri-em-alignment-flows/output/%j.out",
             ],
             "worker_extra_args": [
                 "--lifetime",
@@ -99,15 +113,18 @@ def log_sections_without_mesh(sections: List[Section]):
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 8,
+            "maximum": 16,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
+    persist_result=False,
 )
 def tile_registration_flow(
     exp_path: str = "/path/to/experiment.yaml",
     sample_name: str = "Sample",
     acquisition: str = "run_0",
+    start_section_num: int = None,
+    end_section_num: int = None,
     tile_grid_num: int = 1,
     dt: float = 0.001,
     gamma: float = 0.0,
@@ -134,7 +151,7 @@ def tile_registration_flow(
     min_patch_size: int = 10,
     max_gradient: float = -1.0,
     reconcile_flow_max_deviation: float = -1.0,
-    persist_result=True,
+    persist_result=False,
 ):
     params = dict(locals())
     logger = get_run_logger()
@@ -157,6 +174,8 @@ def tile_registration_flow(
         sample_name=sample_name,
         acquisition=acquisition,
         tile_grid_num=tile_grid_num,
+        start_section_num=start_section_num,
+        end_section_num=end_section_num,
     ).result()
 
     logger.info(f"Found {len(sections)} sections.")

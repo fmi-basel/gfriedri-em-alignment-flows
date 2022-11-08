@@ -64,8 +64,13 @@ def commit_changes(exp: Experiment, name: str):
         cluster_kwargs={
             "account": "dlthings",
             "cores": 2,
-            "memory": "2 GB",
+            "processes": 1,
+            "memory": "512 MB",
             "walltime": "00:10:00",
+            "job_extra_directives": [
+                "--ntasks=1",
+                "--output=/tungstenfs/scratch/gmicro_share/_prefect/slurm/gfriedri-em-alignment-flows/output/%j.out",
+            ],
             "worker_extra_args": ["--lifetime", "8m", "--lifetime-stagger", "2m"],
             "job_script_prologue": [
                 "conda run -p /tungstenfs/scratch/gmicro_share/_prefect/miniconda3/envs/airtable python /tungstenfs/scratch/gmicro_share/_prefect/airtable/log-slurm-job.py --config /tungstenfs/scratch/gmicro/_prefect/airtable/slurm-job-log.ini"
