@@ -1,3 +1,4 @@
+import gc
 from os.path import join
 
 import prefect
@@ -11,7 +12,7 @@ from sbem.tile_stitching.sofima_utils import (
 from sofima import mesh
 
 
-@task(persist_result=False)
+@task(cache_result_in_memory=False)
 def run_sofima(
     section: Section,
     stride: int,
@@ -70,12 +71,27 @@ def run_sofima(
                 section.get_sample().get_name(),
             )
             section.save(path, overwrite=True)
-            return section
+            return clear_memory(section)
         except Exception as e:
             logger.error(e)
             return section
     else:
         return section
+
+
+def clear_memory(section: Section):
+    sec = Section.lazy_loading(
+        name=section.get_name(),
+        section_num=section.get_section_num(),
+        tile_grid_num=section.get_tile_grid_num(),
+        stitched=section.is_stitched(),
+        skip=section.skip(),
+        acquisition=section.get_acquisition(),
+        details="",
+    )
+    del section
+    gc.collect()
+    return sec
 
 
 @task()
