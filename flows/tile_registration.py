@@ -91,7 +91,7 @@ def log_sections_without_mesh(sections: List[Section]):
         cluster_class="dask_jobqueue.SLURMCluster",
         cluster_kwargs={
             "account": "dlthings",
-            "queue": "gpu_short,gpu_long",
+            "queue": "gpu_long",
             "cores": 4,
             "processes": 1,
             "memory": "12 GB",
