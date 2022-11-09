@@ -113,7 +113,7 @@ def log_sections_without_mesh(sections: List[Section]):
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 16,
+            "maximum": 32,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
