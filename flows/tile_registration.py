@@ -69,11 +69,12 @@ def commit_changes(exp: Experiment):
 @task()
 def log_sections_without_mesh(sections: List[Section]):
     names = []
+    sname = sections[0].get_sample().get_name()
     for sec in sections:
+        sec.load_from_yaml()
         if sec.get_alignment_mesh() is None:
             names.append(sec.get_name())
 
-    sname = sections[0].get_sample().get_name()
     file_name = f"{sname}_failed_sections.json"
     path = join(
         sections[0].get_sample().get_experiment().get_root_dir(),
