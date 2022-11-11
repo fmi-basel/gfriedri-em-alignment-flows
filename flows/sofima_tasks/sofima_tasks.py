@@ -89,6 +89,7 @@ def clear_memory(section: Section):
         acquisition=section.get_acquisition(),
         details="",
     )
+    sec.set_sample(section.get_sample())
     del section
     gc.collect()
     return sec
