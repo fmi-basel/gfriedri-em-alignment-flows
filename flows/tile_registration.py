@@ -1,7 +1,7 @@
 import json
 from os import makedirs
 from os.path import join
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import git
 from prefect import flow, get_run_logger, task, unmapped
@@ -140,10 +140,14 @@ def tile_registration_flow(
     start_cap: float = 1.0,
     final_cap: float = 10.0,
     remove_drift: bool = True,
-    overlaps_x: Tuple[int, int] = tuple([200, 300]),
-    overlaps_y: Tuple[int, int] = tuple([200, 300]),
+    overlaps_x0: int = 200,
+    overlaps_x1: int = 300,
+    overlaps_x2: int = 400,
+    overlaps_y0: int = 200,
+    overlaps_y1: int = 300,
+    overlaps_y2: int = 400,
     min_overlap: int = 20,
-    patch_size: Tuple[int, int] = tuple([120, 120]),
+    patch_size: int = 80,
     batch_size: int = 8000,
     min_peak_ratio: float = 1.4,
     min_peak_sharpness: float = 1.4,
@@ -200,10 +204,10 @@ def tile_registration_flow(
     meshes = run_sofima.map(
         sections,
         stride=unmapped(stride),
-        overlaps_x=unmapped(overlaps_x),
-        overlaps_y=unmapped(overlaps_y),
+        overlaps_x=unmapped(tuple([overlaps_x0, overlaps_x1, overlaps_x2])),
+        overlaps_y=unmapped(tuple([overlaps_y0, overlaps_y1, overlaps_y2])),
         min_overlap=unmapped(min_overlap),
-        patch_size=unmapped(patch_size),
+        patch_size=unmapped(tuple([patch_size, patch_size])),
         batch_size=unmapped(batch_size),
         min_peak_ratio=unmapped(min_peak_ratio),
         min_peak_sharpness=unmapped(min_peak_sharpness),
