@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 
@@ -37,13 +39,13 @@ runner = DaskTaskRunner(
 
 @flow(
     name="Logger Test",
-    task_runner=runner,
+    # task_runner=runner,
 )
-def flow():
+def flow(a_tuple: Tuple[int, int], a_list: List[int]):
     logger = get_run_logger()
     logger.info("Flow starts!")
 
-    a_task()
+    a_task.submit()
 
     logger.info("Flow ends!")
 
