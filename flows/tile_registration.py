@@ -6,6 +6,7 @@ from typing import Dict, List
 import git
 from prefect import flow, get_run_logger, task, unmapped
 from prefect_dask import DaskTaskRunner
+from pydantic import BaseModel
 from sbem.experiment.Experiment import Experiment
 from sbem.record.Section import Section
 from utils.env import save_conda_env
@@ -86,6 +87,22 @@ def log_sections_without_mesh(sections: List[Section]):
         json.dump(names, f, indent=4)
 
 
+class Mesh_Integration_Config(BaseModel):
+    dt: float = 0.001
+    gamma: float = 0.0
+    k0: float = 0.01
+    k: float = 0.1
+    stride: int = 20
+    num_iters: int = 1000
+    max_iters: int = 20000
+    stop_v_max: float = 0.001
+    dt_max: float = 100.0
+    prefer_orig_order: bool = True
+    start_cap: float = 1.0
+    final_cap: float = 10.0
+    remove_drift: float = True
+
+
 @flow(
     name="Register Tiles",
     task_runner=DaskTaskRunner(
@@ -127,27 +144,11 @@ def tile_registration_flow(
     start_section_num: int = None,
     end_section_num: int = None,
     tile_grid_num: int = 1,
-    dt: float = 0.001,
-    gamma: float = 0.0,
-    k0: float = 0.01,
-    k: float = 0.1,
-    stride: int = 20,
-    num_iters: int = 1000,
-    max_iters: int = 20000,
-    stop_v_max: float = 0.001,
-    dt_max: float = 100.0,
-    prefer_orig_order: bool = True,
-    start_cap: float = 1.0,
-    final_cap: float = 10.0,
-    remove_drift: bool = True,
-    overlaps_x0: int = 200,
-    overlaps_x1: int = 300,
-    overlaps_x2: int = 400,
-    overlaps_y0: int = 200,
-    overlaps_y1: int = 300,
-    overlaps_y2: int = 400,
+    mesh_integration_config: Mesh_Integration_Config = Mesh_Integration_Config(),
+    overlaps_x: List[int] = [200, 300, 400],
+    overlaps_y: List[int] = [200, 300, 400],
     min_overlap: int = 20,
-    patch_size: int = 80,
+    patch_size: List[int] = [80, 80],
     batch_size: int = 8000,
     min_peak_ratio: float = 1.4,
     min_peak_sharpness: float = 1.4,
@@ -186,26 +187,14 @@ def tile_registration_flow(
     logger.info(f"Found {len(sections)} sections.")
 
     integration_config = build_integration_config.submit(
-        dt=dt,
-        gamma=gamma,
-        k0=k0,
-        k=k,
-        stride=stride,
-        num_iters=num_iters,
-        max_iters=max_iters,
-        stop_v_max=stop_v_max,
-        dt_max=dt_max,
-        prefer_orig_order=prefer_orig_order,
-        start_cap=start_cap,
-        final_cap=final_cap,
-        remove_drift=remove_drift,
+        *mesh_integration_config.dict()
     )
 
     meshes = run_sofima.map(
         sections,
-        stride=unmapped(stride),
-        overlaps_x=unmapped(tuple([overlaps_x0, overlaps_x1, overlaps_x2])),
-        overlaps_y=unmapped(tuple([overlaps_y0, overlaps_y1, overlaps_y2])),
+        stride=unmapped(mesh_integration_config.stride),
+        overlaps_x=unmapped(tuple(overlaps_x)),
+        overlaps_y=unmapped(tuple(overlaps_y)),
         min_overlap=unmapped(min_overlap),
         patch_size=unmapped(tuple([patch_size, patch_size])),
         batch_size=unmapped(batch_size),
@@ -219,11 +208,9 @@ def tile_registration_flow(
         integration_config=unmapped(integration_config),
     )
 
-    failed_ones = log_sections_without_mesh.submit(sections=meshes)
-
     commit_changes.submit(
         exp=exp,
-        wait_for=[exp, failed_ones, save_env, save_sys, run_context],
+        wait_for=[exp, save_env, save_sys, run_context],
     )
 
     return meshes
