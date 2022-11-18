@@ -1,6 +1,10 @@
+if False:  # TYPE_CHECKING
+    from typing import Literal
+
 import numpy as np
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
+from pydantic import BaseModel
 
 runner = DaskTaskRunner(
     cluster_class="dask_jobqueue.SLURMCluster",
@@ -43,11 +47,16 @@ def a_task(i):
     # os.system("sleep 5")
 
 
+class FMI_User(BaseModel):
+    group: Literal["gmicro", "gfriedri", "gchao"]
+    user: str
+
+
 @flow(
     name="Logger Test",
     task_runner=runner,
 )
-def flow():
+def flow(group_user: FMI_User):
     logger = get_run_logger()
     logger.info("Flow starts!")
 
