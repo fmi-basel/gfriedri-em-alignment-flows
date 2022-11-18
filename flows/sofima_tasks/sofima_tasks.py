@@ -1,4 +1,5 @@
 import gc
+import traceback
 from os.path import join
 
 import prefect
@@ -64,6 +65,7 @@ def run_sofima(
                 max_gradient=max_gradient,
                 reconcile_flow_max_deviation=reconcile_flow_max_deviation,
                 integration_config=integration_config,
+                logger=logger,
             )
             path = join(
                 section.get_sample().get_experiment().get_root_dir(),
@@ -73,7 +75,10 @@ def run_sofima(
             section.save(path, overwrite=True)
             return clear_memory(section)
         except Exception as e:
+            logger.error(f"Encounter error in section " f"{section.get_section_dir()}.")
             logger.error(e)
+            tb = traceback.format_exc()
+            logger.error(tb)
             return section
     else:
         return section
