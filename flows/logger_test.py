@@ -1,15 +1,5 @@
-from typing import List, Tuple
-
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
-
-
-@task()
-def a_task():
-    logger = get_run_logger()
-
-    logger.info("I am logging from a task.")
-
 
 runner = DaskTaskRunner(
     cluster_class="dask_jobqueue.SLURMCluster",
@@ -34,18 +24,27 @@ runner = DaskTaskRunner(
     },
 )
 
-# runner = DaskTaskRunner()
+
+# runner = DaskTaskRunner(client_kwargs={})
+
+
+@task()
+def a_task(i):
+    logger = get_run_logger()
+    logger.info(f"I am logging from a task. {i}")
 
 
 @flow(
     name="Logger Test",
-    # task_runner=runner,
+    task_runner=runner,
 )
-def flow(a_tuple: Tuple[int, int], a_list: List[int]):
+def flow():
     logger = get_run_logger()
     logger.info("Flow starts!")
 
-    a_task.submit()
+    a_task.map(range(3))
+
+    a_task.submit(4)
 
     logger.info("Flow ends!")
 
