@@ -1,15 +1,19 @@
 import json
 from os.path import join
-from typing import Dict, List
+from typing import Dict
 
 import git
 from prefect import flow, get_run_logger, task, unmapped
 from prefect_dask import DaskTaskRunner
-from pydantic import BaseModel
 from sbem.experiment.Experiment import Experiment
 from utils.env import save_conda_env
 from utils.system import save_system_information
 
+from flows.flow_parameter_types.ExperimentConfig import ExperimentConfig
+from flows.flow_parameter_types.TileRegistrationConfig import (
+    MeshIntegrationConfig,
+    RegistrationConfig,
+)
 from flows.sofima_tasks.sofima_tasks import build_integration_config, run_sofima
 
 
@@ -63,46 +67,6 @@ def commit_changes(exp: Experiment):
         repo.index.add(repo.untracked_files)
         repo.index.add([item.a_path for item in repo.index.diff(None)])
         repo.index.commit("Compute tile-registration meshes.", author=exp._git_author)
-
-
-class MeshIntegrationConfig(BaseModel):
-    dt: float = 0.001
-    gamma: float = 0.0
-    k0: float = 0.01
-    k: float = 0.1
-    stride: int = 20
-    num_iters: int = 1000
-    max_iters: int = 20000
-    stop_v_max: float = 0.001
-    dt_max: float = 100.0
-    prefer_orig_order: bool = True
-    start_cap: float = 1.0
-    final_cap: float = 10.0
-    remove_drift: bool = True
-
-
-class RegistrationConfig(BaseModel):
-    overlaps_x: List[int] = [200, 300, 400]
-    overlaps_y: List[int] = [200, 300, 400]
-    min_overlap: int = 20
-    patch_size: List[int] = [80, 80]
-    batch_size: int = 8000
-    min_peak_ratio: float = 1.4
-    min_peak_sharpness: float = 1.4
-    max_deviation: float = 5.0
-    max_magnitude: float = 0.0
-    min_patch_size: int = 10
-    max_gradient: float = -1.0
-    reconcile_flow_max_deviation: float = -1.0
-
-
-class ExperimentConfig(BaseModel):
-    exp_path: str = "/path/to/experiment.yaml"
-    sample_name: str = None
-    acquisition: str = None
-    start_section_num: int = None
-    end_section_num: int = None
-    tile_grid_num: int = None
 
 
 @flow(
