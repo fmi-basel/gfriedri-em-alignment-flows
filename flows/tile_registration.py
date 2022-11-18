@@ -105,11 +105,11 @@ class Mesh_Integration_Config(BaseModel):
 
 class Experiment_Config(BaseModel):
     exp_path: str = "/path/to/experiment.yaml"
-    sample_name: str
-    acquisition: str
+    sample_name: str = None
+    acquisition: str = None
     start_section_num: int = None
     end_section_num: int = None
-    tile_grid_num: int
+    tile_grid_num: int = None
 
 
 @flow(
