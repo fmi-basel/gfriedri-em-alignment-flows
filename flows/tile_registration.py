@@ -55,6 +55,7 @@ def save_params(output_dir: str, params: Dict):
     logger = get_run_logger()
 
     outpath = join(output_dir, "args_tile-registration.json")
+
     with open(outpath, "w") as f:
         json.dump(params, f, indent=4)
 
@@ -108,7 +109,11 @@ def tile_registration_flow(
     mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
     registration_config: RegistrationConfig = RegistrationConfig(),
 ):
-    params = dict(locals())
+    params = {
+        "exp_config": exp_config.dict(),
+        "mesh_integration_config": mesh_integration_config.dict(),
+        "registration_config": registration_config.dict(),
+    }
     logger = get_run_logger()
     exp = load_experiment.submit(path=exp_config.exp_path).result()
 
