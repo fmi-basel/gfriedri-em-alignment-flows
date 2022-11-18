@@ -1,5 +1,4 @@
-if False:  # TYPE_CHECKING
-    from typing import Literal
+from typing import Literal
 
 import numpy as np
 from prefect import flow, get_run_logger, task
