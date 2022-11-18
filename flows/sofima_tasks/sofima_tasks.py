@@ -79,9 +79,9 @@ def run_sofima(
             logger.error(e)
             tb = traceback.format_exc()
             logger.error(tb)
-            return section
+            return clear_memory(section)
     else:
-        return section
+        return clear_memory(section)
 
 
 def clear_memory(section: Section):
