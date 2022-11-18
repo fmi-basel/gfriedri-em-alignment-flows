@@ -36,6 +36,7 @@ def a_task(i):
     logger.info(f"I am logging from a task. {i}")
     api_url = os.environ["PREFECT_API_URL"]
     logger.info(f"Task: PREFECT_API_URL = {api_url}")
+    os.system("sleep 5")
 
 
 @flow(
