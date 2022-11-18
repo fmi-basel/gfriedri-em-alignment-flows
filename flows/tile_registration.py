@@ -144,7 +144,19 @@ def tile_registration_flow(
     logger.info(f"Found {len(sections)} sections.")
 
     integration_config = build_integration_config.submit(
-        *mesh_integration_config.dict()
+        dt=mesh_integration_config.dt,
+        gamma=mesh_integration_config.gamma,
+        k0=mesh_integration_config.k0,
+        k=mesh_integration_config.k,
+        stride=mesh_integration_config.stride,
+        num_iters=mesh_integration_config.num_iters,
+        max_iters=mesh_integration_config.max_iters,
+        stop_v_max=mesh_integration_config.stop_v_max,
+        dt_max=mesh_integration_config.dt_max,
+        prefer_orig_order=mesh_integration_config.prefer_orig_order,
+        start_cap=mesh_integration_config.start_cap,
+        final_cap=mesh_integration_config.final_cap,
+        remove_drift=mesh_integration_config.remove_drift,
     )
 
     meshes = run_sofima.map(
