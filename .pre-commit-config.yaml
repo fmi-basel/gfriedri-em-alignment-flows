@@ -13,7 +13,8 @@ repos:
     rev: 4.0.1
     hooks:
       - id: flake8
-        args: [ "--ignore=E203,E501", "--max-complexity=12"]
+        args: [ "--ignore=E203,E501", "--max-complexity=12",
+        "type-checking-pydantic-enabled=true"]
         additional_dependencies: [ flake8-typing-imports==1.7.0 ]
   - repo: https://github.com/myint/autoflake
     rev: v1.4
