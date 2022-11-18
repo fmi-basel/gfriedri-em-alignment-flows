@@ -155,18 +155,20 @@ def build_integration_config(
     final_cap,
     remove_drift,
 ):
+    logger = get_run_logger()
+    logger.info(f"Integration config parameters: {locals()}")
     return mesh.IntegrationConfig(
-        dt=dt,
-        gamma=gamma,
-        k0=k0,
-        k=k,
-        stride=stride,
-        num_iters=num_iters,
-        max_iters=max_iters,
-        stop_v_max=stop_v_max,
-        dt_max=dt_max,
-        prefer_orig_order=prefer_orig_order,
-        start_cap=start_cap,
-        final_cap=final_cap,
-        remove_drift=remove_drift,
+        dt=float(dt),
+        gamma=float(gamma),
+        k0=float(k0),
+        k=float(k),
+        stride=int(stride),
+        num_iters=int(num_iters),
+        max_iters=int(max_iters),
+        stop_v_max=float(stop_v_max),
+        dt_max=float(dt_max),
+        prefer_orig_order=bool(prefer_orig_order),
+        start_cap=float(start_cap),
+        final_cap=float(final_cap),
+        remove_drift=bool(remove_drift),
     )
