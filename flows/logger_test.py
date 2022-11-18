@@ -1,3 +1,5 @@
+import os
+
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 
@@ -32,6 +34,8 @@ runner = DaskTaskRunner(
 def a_task(i):
     logger = get_run_logger()
     logger.info(f"I am logging from a task. {i}")
+    api_url = os.environ["PREFECT_API_URL"]
+    logger.info(f"Task: PREFECT_API_URL = {api_url}")
 
 
 @flow(
@@ -41,6 +45,8 @@ def a_task(i):
 def flow():
     logger = get_run_logger()
     logger.info("Flow starts!")
+    api_url = os.environ["PREFECT_API_URL"]
+    logger.info(f"Flow: PREFECT_API_URL = {api_url}")
 
     a_task.map(range(3))
 
