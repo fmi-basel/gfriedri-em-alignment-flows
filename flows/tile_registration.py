@@ -100,7 +100,16 @@ class Mesh_Integration_Config(BaseModel):
     prefer_orig_order: bool = True
     start_cap: float = 1.0
     final_cap: float = 10.0
-    remove_drift: float = True
+    remove_drift: bool = True
+
+
+class Experiment_Config(BaseModel):
+    exp_path: str = "/path/to/experiment.yaml"
+    sample_name: str
+    acquisition: str
+    start_section_num: int = None
+    end_section_num: int = None
+    tile_grid_num: int
 
 
 @flow(
@@ -138,12 +147,7 @@ class Mesh_Integration_Config(BaseModel):
     persist_result=False,
 )
 def tile_registration_flow(
-    exp_path: str = "/path/to/experiment.yaml",
-    sample_name: str = "Sample",
-    acquisition: str = "run_0",
-    start_section_num: int = None,
-    end_section_num: int = None,
-    tile_grid_num: int = 1,
+    exp_config: Experiment_Config = Experiment_Config(),
     mesh_integration_config: Mesh_Integration_Config = Mesh_Integration_Config(),
     overlaps_x: List[int] = [200, 300, 400],
     overlaps_y: List[int] = [200, 300, 400],
@@ -157,11 +161,10 @@ def tile_registration_flow(
     min_patch_size: int = 10,
     max_gradient: float = -1.0,
     reconcile_flow_max_deviation: float = -1.0,
-    persist_result=False,
 ):
     params = dict(locals())
     logger = get_run_logger()
-    exp = load_experiment.submit(path=exp_path).result()
+    exp = load_experiment.submit(path=exp_config.exp_path).result()
 
     save_env = save_conda_env.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -177,11 +180,11 @@ def tile_registration_flow(
 
     sections = get_sections.submit(
         exp=exp,
-        sample_name=sample_name,
-        acquisition=acquisition,
-        tile_grid_num=tile_grid_num,
-        start_section_num=start_section_num,
-        end_section_num=end_section_num,
+        sample_name=exp_config.sample_name,
+        acquisition=exp_config.acquisition,
+        tile_grid_num=exp_config.tile_grid_num,
+        start_section_num=exp_config.start_section_num,
+        end_section_num=exp_config.end_section_num,
     ).result()
 
     logger.info(f"Found {len(sections)} sections.")
