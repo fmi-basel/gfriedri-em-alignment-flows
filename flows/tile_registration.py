@@ -31,6 +31,9 @@ def get_sections(
     start_section_num: int,
     end_section_num: int,
 ):
+    logger = get_run_logger()
+    logger.info(f"Sample: {sample_name} of acquisition {acquisition}")
+    logger.info(f"Retrieving sections {start_section_num} to " f"{end_section_num}.")
     if start_section_num is not None and end_section_num is not None:
         return exp.get_sample(sample_name).get_section_range(
             start_section_num=start_section_num,
