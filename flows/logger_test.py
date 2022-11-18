@@ -1,5 +1,4 @@
-from time import sleep
-
+import numpy as np
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 
@@ -34,7 +33,13 @@ runner = DaskTaskRunner(
 def a_task(i):
     logger = get_run_logger()
     logger.info(f"I am logging from a task. {i}")
-    sleep(5)
+    img = np.random.rand(1000, 1000)
+    for y in range(1000):
+        for x in range(1000):
+            img[y, x] = img[x, y]
+
+    logger.info("Done.")
+    # sleep(5)
     # os.system("sleep 5")
 
 
