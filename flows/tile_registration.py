@@ -1,5 +1,4 @@
 import json
-from os import makedirs
 from os.path import join
 from typing import Dict, List
 
@@ -8,7 +7,6 @@ from prefect import flow, get_run_logger, task, unmapped
 from prefect_dask import DaskTaskRunner
 from pydantic import BaseModel
 from sbem.experiment.Experiment import Experiment
-from sbem.record.Section import Section
 from utils.env import save_conda_env
 from utils.system import save_system_information
 
@@ -67,27 +65,7 @@ def commit_changes(exp: Experiment):
         repo.index.commit("Compute tile-registration meshes.", author=exp._git_author)
 
 
-@task()
-def log_sections_without_mesh(sections: List[Section]):
-    names = []
-    sname = sections[0].get_sample().get_name()
-    for sec in sections:
-        sec.load_from_yaml()
-        if sec.get_alignment_mesh() is None:
-            names.append(sec.get_name())
-
-    file_name = f"{sname}_failed_sections.json"
-    path = join(
-        sections[0].get_sample().get_experiment().get_root_dir(),
-        sections[0].get_sample().get_experiment().get_name(),
-        "tile-registration-errors",
-    )
-    makedirs(path, exist_ok=True)
-    with open(join(path, file_name), "w") as f:
-        json.dump(names, f, indent=4)
-
-
-class Mesh_Integration_Config(BaseModel):
+class MeshIntegrationConfig(BaseModel):
     dt: float = 0.001
     gamma: float = 0.0
     k0: float = 0.01
@@ -103,7 +81,22 @@ class Mesh_Integration_Config(BaseModel):
     remove_drift: bool = True
 
 
-class Experiment_Config(BaseModel):
+class RegistrationConfig(BaseModel):
+    overlaps_x: List[int] = [200, 300, 400]
+    overlaps_y: List[int] = [200, 300, 400]
+    min_overlap: int = 20
+    patch_size: List[int] = [80, 80]
+    batch_size: int = 8000
+    min_peak_ratio: float = 1.4
+    min_peak_sharpness: float = 1.4
+    max_deviation: float = 5.0
+    max_magnitude: float = 0.0
+    min_patch_size: int = 10
+    max_gradient: float = -1.0
+    reconcile_flow_max_deviation: float = -1.0
+
+
+class ExperimentConfig(BaseModel):
     exp_path: str = "/path/to/experiment.yaml"
     sample_name: str = None
     acquisition: str = None
@@ -147,20 +140,9 @@ class Experiment_Config(BaseModel):
     persist_result=False,
 )
 def tile_registration_flow(
-    exp_config: Experiment_Config = Experiment_Config(),
-    mesh_integration_config: Mesh_Integration_Config = Mesh_Integration_Config(),
-    overlaps_x: List[int] = [200, 300, 400],
-    overlaps_y: List[int] = [200, 300, 400],
-    min_overlap: int = 20,
-    patch_size: List[int] = [80, 80],
-    batch_size: int = 8000,
-    min_peak_ratio: float = 1.4,
-    min_peak_sharpness: float = 1.4,
-    max_deviation: float = 5.0,
-    max_magnitude: float = 0.0,
-    min_patch_size: int = 10,
-    max_gradient: float = -1.0,
-    reconcile_flow_max_deviation: float = -1.0,
+    exp_config: ExperimentConfig = ExperimentConfig(),
+    mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    registration_config: RegistrationConfig = RegistrationConfig(),
 ):
     params = dict(locals())
     logger = get_run_logger()
@@ -196,18 +178,20 @@ def tile_registration_flow(
     meshes = run_sofima.map(
         sections,
         stride=unmapped(mesh_integration_config.stride),
-        overlaps_x=unmapped(tuple(overlaps_x)),
-        overlaps_y=unmapped(tuple(overlaps_y)),
-        min_overlap=unmapped(min_overlap),
-        patch_size=unmapped(tuple([patch_size, patch_size])),
-        batch_size=unmapped(batch_size),
-        min_peak_ratio=unmapped(min_peak_ratio),
-        min_peak_sharpness=unmapped(min_peak_sharpness),
-        max_deviation=unmapped(max_deviation),
-        max_magnitude=unmapped(max_magnitude),
-        min_patch_size=unmapped(min_patch_size),
-        max_gradient=unmapped(max_gradient),
-        reconcile_flow_max_deviation=unmapped(reconcile_flow_max_deviation),
+        overlaps_x=unmapped(tuple(registration_config.overlaps_x)),
+        overlaps_y=unmapped(tuple(registration_config.overlaps_y)),
+        min_overlap=unmapped(registration_config.min_overlap),
+        patch_size=unmapped(tuple(registration_config.patch_size)),
+        batch_size=unmapped(registration_config.batch_size),
+        min_peak_ratio=unmapped(registration_config.min_peak_ratio),
+        min_peak_sharpness=unmapped(registration_config.min_peak_sharpness),
+        max_deviation=unmapped(registration_config.max_deviation),
+        max_magnitude=unmapped(registration_config.max_magnitude),
+        min_patch_size=unmapped(registration_config.min_patch_size),
+        max_gradient=unmapped(registration_config.max_gradient),
+        reconcile_flow_max_deviation=unmapped(
+            registration_config.reconcile_flow_max_deviation
+        ),
         integration_config=unmapped(integration_config),
     )
 
