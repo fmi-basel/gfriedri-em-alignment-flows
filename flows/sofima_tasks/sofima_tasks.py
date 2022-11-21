@@ -1,5 +1,4 @@
 import gc
-import traceback
 from os.path import join
 
 import prefect
@@ -76,9 +75,6 @@ def run_sofima(
             return clear_memory(section)
         except Exception as e:
             logger.error(f"Encounter error in section " f"{section.get_section_dir()}.")
-            logger.error(e)
-            tb = traceback.format_exc()
-            logger.error(tb)
             raise e
     else:
         return clear_memory(section)
