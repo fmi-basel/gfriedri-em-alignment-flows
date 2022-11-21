@@ -79,7 +79,7 @@ def run_sofima(
             logger.error(e)
             tb = traceback.format_exc()
             logger.error(tb)
-            return clear_memory(section)
+            raise e
     else:
         return clear_memory(section)
 
