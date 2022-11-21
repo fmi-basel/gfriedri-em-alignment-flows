@@ -34,8 +34,6 @@ def a_task(i):
     logger.info(f"I am logging from a task. {i}")
 
     logger.info("Done.")
-    # sleep(5)
-    # os.system("sleep 5")
 
 
 @flow(
