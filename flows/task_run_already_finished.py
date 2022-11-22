@@ -8,7 +8,7 @@ from prefect_dask import DaskTaskRunner
 async def my_task(id: int):
     logger = get_run_logger()
     logger.info(f"Hello from my_task #{id}! Sleeping for 30 seconds...")
-    time.sleep(30)
+    time.sleep(3)
     logger.info(f"my_task #{id} done!")
 
 
@@ -38,8 +38,6 @@ def my_flow():
     logger = get_run_logger()
     logger.info("Starting")
     # Spam tasks here!
-    for i in range(1, 50):
+    for i in range(1, 500):
         logger.debug("Starting a task run #%d", i)
         my_task.submit(i + 1)
-        logger.debug("Sleeping after task run submission for 5 sec")
-        time.sleep(5)
