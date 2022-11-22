@@ -179,12 +179,9 @@ def tile_registration_flow(
         integration_config=unmapped(integration_config),
     )
 
-    for m in meshes:
-        m.result(raise_on_failure=False)
-
     commit_changes.submit(
         exp=exp,
-        wait_for=[exp, save_env, save_sys, run_context],
+        wait_for=[exp, meshes, save_env, save_sys, run_context],
     )
 
     return meshes
