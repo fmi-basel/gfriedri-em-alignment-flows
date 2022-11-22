@@ -180,7 +180,7 @@ def tile_registration_flow(
     )
 
     for m in meshes:
-        m.wait()
+        m.result(raise_on_failure=False)
 
     commit_changes.submit(
         exp=exp,

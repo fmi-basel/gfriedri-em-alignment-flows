@@ -12,7 +12,7 @@ from sbem.tile_stitching.sofima_utils import (
 from sofima import mesh
 
 
-@task(cache_result_in_memory=False)
+@task(cache_result_in_memory=False, persist_result=True)
 def run_sofima(
     section: Section,
     stride: int,
