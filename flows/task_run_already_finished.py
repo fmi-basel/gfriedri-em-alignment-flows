@@ -4,12 +4,23 @@ from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 
 
-@task
-async def my_task(id: int):
+@task()
+def get_list(n=500):
+    return range(1, n)
+
+
+@task(cache_result_in_memory=False)
+def my_task(id: int):
     logger = get_run_logger()
     logger.info(f"Hello from my_task #{id}! Sleeping for 30 seconds...")
     time.sleep(3)
     logger.info(f"my_task #{id} done!")
+    return id
+
+
+@task()
+def done():
+    get_run_logger().info("Done")
 
 
 @flow(
@@ -33,11 +44,18 @@ async def my_task(id: int):
             "maximum": 32,
         },
     ),
+    persist_result=False,
 )
 def my_flow():
     logger = get_run_logger()
     logger.info("Starting")
-    # Spam tasks here!
-    for i in range(1, 500):
-        logger.debug("Starting a task run #%d", i)
-        my_task.submit(i + 1)
+
+    ids = get_list()
+    tasks = my_task.map(ids)
+
+    for t in tasks:
+        t.wait()
+
+    logger.info("Done submitting")
+
+    done()
