@@ -4,6 +4,7 @@ from typing import Dict
 
 import git
 from prefect import flow, get_run_logger, task, unmapped
+from prefect.futures import PrefectFuture
 from prefect_dask import DaskTaskRunner
 from sbem.experiment.Experiment import Experiment
 from utils.env import save_conda_env
@@ -63,6 +64,16 @@ def save_params(output_dir: str, params: Dict):
         json.dump(params, f, indent=4)
 
     logger.info(f"Saved flow parameters to {outpath}.")
+
+
+@task()
+def log_issues(mesh: PrefectFuture, section):
+    logger = get_run_logger()
+    state = mesh.get_state()
+    if state.is_failed():
+        logger.error(f"Encounter error in section {section.get_section_dir()}")
+
+    return section
 
 
 @task()
@@ -179,9 +190,11 @@ def tile_registration_flow(
         integration_config=unmapped(integration_config),
     )
 
+    logged_sections = log_issues.map(meshes, sections)
+
     commit_changes.submit(
         exp=exp,
-        wait_for=[exp, save_env, save_sys, run_context],
+        wait_for=[exp, logged_sections, save_env, save_sys, run_context],
     )
 
     return meshes
