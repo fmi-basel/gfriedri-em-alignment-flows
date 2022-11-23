@@ -47,31 +47,38 @@ def run_sofima(
 
     section.load_from_yaml()
     if section.get_alignment_mesh() is None:
-        register_tiles(
-            section,
-            stride=stride,
-            overlaps_x=overlaps_x,
-            overlaps_y=overlaps_y,
-            min_overlap=min_overlap,
-            patch_size=patch_size,
-            batch_size=batch_size,
-            min_peak_ratio=min_peak_ratio,
-            min_peak_sharpness=min_peak_sharpness,
-            max_deviation=max_deviation,
-            max_magnitude=max_magnitude,
-            min_patch_size=min_patch_size,
-            max_gradient=max_gradient,
-            reconcile_flow_max_deviation=reconcile_flow_max_deviation,
-            integration_config=integration_config,
-            logger=logger,
-        )
+        try:
+            register_tiles(
+                section,
+                stride=stride,
+                overlaps_x=overlaps_x,
+                overlaps_y=overlaps_y,
+                min_overlap=min_overlap,
+                patch_size=patch_size,
+                batch_size=batch_size,
+                min_peak_ratio=min_peak_ratio,
+                min_peak_sharpness=min_peak_sharpness,
+                max_deviation=max_deviation,
+                max_magnitude=max_magnitude,
+                min_patch_size=min_patch_size,
+                max_gradient=max_gradient,
+                reconcile_flow_max_deviation=reconcile_flow_max_deviation,
+                integration_config=integration_config,
+                logger=logger,
+            )
+        except StopIteration as e:
+            raise RuntimeError("Stop Iteration exception.").with_traceback(
+                e.__traceback__
+            )
+
         path = join(
             section.get_sample().get_experiment().get_root_dir(),
             section.get_sample().get_experiment().get_name(),
             section.get_sample().get_name(),
         )
         section.save(path, overwrite=True)
-        return clear_memory(section)
+
+    return clear_memory(section)
 
 
 def clear_memory(section: Section):
