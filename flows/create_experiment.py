@@ -85,12 +85,12 @@ def commit_changes(exp: Experiment):
             "maximum": 1,
         },
     ),
+    persist_result=False,
 )
 def create_experiment_flow(
     name: str = "experiment",
     description: str = "Experiment to answer questions.",
     root_dir: str = "/tungstenfs/scratch/gmicro_sem",
-    persist_result=False,
 ):
     params = dict(locals())
     exp = create_experiment.submit(

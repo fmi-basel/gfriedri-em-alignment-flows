@@ -81,12 +81,12 @@ def commit_changes(exp: Experiment, name: str):
             "maximum": 1,
         },
     ),
+    persist_result=False,
 )
 def add_sample_to_experiment_flow(
     exp_path: str = "/path/to/experiment.yaml",
     name: str = "Sample",
     description: str = "My best sample.",
-    persist_result=False,
 ):
     params = dict(locals())
     exp = load_experiment.submit(path=exp_path).result()

@@ -99,6 +99,7 @@ def commit_changes(exp: Experiment, name: str):
             "maximum": 1,
         },
     ),
+    persist_result=False,
 )
 def add_sections_to_sample_flow(
     exp_path: str = "/path/to/experiment.yaml",
