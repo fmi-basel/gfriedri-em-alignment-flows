@@ -183,5 +183,3 @@ def tile_registration_flow(
         exp=exp,
         wait_for=[exp, meshes, save_env, save_sys, run_context],
     )
-
-    return meshes
