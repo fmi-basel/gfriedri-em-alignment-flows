@@ -19,7 +19,6 @@ def load_experiment(path: str):
 
 @task()
 def create_volume(
-    volume_save_dir: str,
     volume_name: str,
     description: str,
     exp: Experiment,
@@ -30,7 +29,7 @@ def create_volume(
         description=description,
         documentation="",
         authors=exp._authors,
-        root_dir=volume_save_dir,
+        root_dir=join(exp.get_root_dir(), exp.get_name()),
         exist_ok=False,
         license=exp.get_license(),
         cite=exp._cite,
@@ -69,6 +68,12 @@ def commit_changes(exp: Experiment, volume_name: str, name: str):
         )
 
 
+@task
+def add_gitignore(output_dir: str):
+    with open(join(output_dir, ".gitignore"), "a") as f:
+        f.writelines(["ngff_volume.zarr/\n"])
+
+
 @flow(
     name="Add Volume",
     task_runner=DaskTaskRunner(
@@ -98,19 +103,13 @@ def commit_changes(exp: Experiment, volume_name: str, name: str):
 def add_volume_flow(
     exp_path: str = "/path/to/experiment.yaml",
     sample_name: str = "Sample",
-    volume_save_dir: str = "/path/to/the/save/dir",
     volume_name: str = "Volume",
-    description: str = "A aligned volume.",
+    description: str = "An aligned volume.",
 ):
     params = dict(locals())
-    exp: Experiment = load_experiment(path=exp_path)
-
-    assert (
-        join(exp.get_root_dir(), exp.get_name()) != volume_save_dir
-    ), "The volume must be saved outside of the experiment."
+    exp: Experiment = load_experiment.submit(path=exp_path).result()
 
     volume = create_volume(
-        volume_save_dir=volume_save_dir,
         volume_name=volume_name,
         description=description,
         exp=exp,
@@ -129,9 +128,13 @@ def add_volume_flow(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing"), params=params
     )
 
+    gitignore = add_gitignore.submit(
+        output_dir=join(exp.get_root_dir(), exp.get_name())
+    )
+
     commit_changes.submit(
         exp=exp,
         volume_name=volume_name,
         name=sample_name,
-        wait_for=[exp, volume, save_env, save_sys, run_context],
+        wait_for=[exp, volume, save_env, save_sys, run_context, gitignore],
     )
