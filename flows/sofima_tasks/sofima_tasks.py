@@ -1,4 +1,3 @@
-import gc
 from os.path import join
 
 import prefect
@@ -14,7 +13,7 @@ from sofima import mesh
 
 @task(cache_result_in_memory=False, persist_result=False)
 def run_sofima(
-    section: Section,
+    section_dict: dict,
     stride: int,
     overlaps_x: tuple,
     overlaps_y: tuple,
@@ -30,13 +29,12 @@ def run_sofima(
     reconcile_flow_max_deviation: float = -1,
     integration_config: mesh.IntegrationConfig = default_mesh_integration_config(),
 ):
+    path = section_dict.pop("path")
+    section = Section.lazy_loading(**section_dict)
+    section_path = join(path, "section.yaml")
+    section.load_from_yaml(section_path)
     logger = get_run_logger()
-    sec_long_name = join(
-        section.get_sample().get_experiment().get_name(),
-        section.get_sample().get_name(),
-        section.get_name(),
-    )
-    logger.info(f"Compute mesh for section {sec_long_name}.")
+    logger.info(f"Compute mesh for section {section_path}.")
 
     import os
 
@@ -45,11 +43,11 @@ def run_sofima(
 
     from sbem.tile_stitching.sofima_utils import register_tiles
 
-    section.load_from_yaml()
     if section.get_alignment_mesh() is None:
         try:
             register_tiles(
                 section,
+                section_dir=path,
                 stride=stride,
                 overlaps_x=overlaps_x,
                 overlaps_y=overlaps_y,
@@ -71,30 +69,9 @@ def run_sofima(
                 e.__traceback__
             )
 
-        path = join(
-            section.get_sample().get_experiment().get_root_dir(),
-            section.get_sample().get_experiment().get_name(),
-            section.get_sample().get_name(),
-        )
         section.save(path, overwrite=True)
 
-    return clear_memory(section)
-
-
-def clear_memory(section: Section):
-    sec = Section.lazy_loading(
-        name=section.get_name(),
-        section_num=section.get_section_num(),
-        tile_grid_num=section.get_tile_grid_num(),
-        stitched=section.is_stitched(),
-        skip=section.skip(),
-        acquisition=section.get_acquisition(),
-        details="",
-    )
-    sec.set_sample(section.get_sample())
-    del section
-    gc.collect()
-    return sec
+    return section_path
 
 
 @task()
