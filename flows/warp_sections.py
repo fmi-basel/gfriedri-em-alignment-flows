@@ -8,7 +8,6 @@ import prefect
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 from sbem.experiment import Experiment
-from sbem.record.Sample import Sample
 from sbem.record.Section import Section
 from sbem.storage.Volume import Volume
 from sbem.tile_stitching.sofima_utils import render_tiles
@@ -24,7 +23,7 @@ def load_experiment(path: str):
     return Experiment.load(path)
 
 
-@task(cache_result_in_memory=False)
+@task(persist_result=False)
 def get_sections(
     exp: Experiment,
     sample_name: str,
@@ -37,16 +36,39 @@ def get_sections(
     logger.info(f"Sample: {sample_name} of acquisition {acquisition}")
     logger.info(f"Retrieving sections {start_section_num} to " f"{end_section_num}.")
     if start_section_num is not None and end_section_num is not None:
-        return exp.get_sample(sample_name).get_section_range(
+        sections = exp.get_sample(sample_name).get_section_range(
             start_section_num=start_section_num,
             end_section_num=end_section_num,
             tile_grid_num=tile_grid_num,
             include_skipped=False,
         )
     else:
-        return exp.get_sample(sample_name).get_sections_of_acquisition(
+        sections = exp.get_sample(sample_name).get_sections_of_acquisition(
             acquisition=acquisition, tile_grid_num=tile_grid_num, include_skipped=False
         )
+
+    section_paths = []
+    path = join(
+        sections[0].get_sample().get_experiment().get_root_dir(),
+        sections[0].get_sample().get_experiment().get_name(),
+        sections[0].get_sample().get_name(),
+    )
+    for s in sections:
+        if not s.is_stitched():
+            section_paths.append(
+                {
+                    "name": s.get_name(),
+                    "stitched": s.is_stitched(),
+                    "skip": s.skip(),
+                    "acquisition": s.get_acquisition(),
+                    "section_num": s.get_section_num(),
+                    "tile_grid_num": s.get_tile_grid_num(),
+                    "details": "",
+                    "path": join(path, s.get_name()),
+                }
+            )
+
+    return section_paths
 
 
 @task()
@@ -116,33 +138,34 @@ def get_volume_z_pos(volume: Volume, section: Section):
 
 @task(cache_result_in_memory=False, retries=1, retry_delay_seconds=30)
 def warp_and_save(
-    sample: Sample,
-    tile_grid_num: int,
-    section,
-    volume,
+    section_dict: dict,
+    zeroth_section_dict: dict,
+    volume_path: str,
     stride: int,
     margin: int,
     use_clahe: bool,
     clahe_kwargs: Dict,
 ):
     logger = get_run_logger()
+    path = section_dict.pop("path")
+    section = Section.lazy_loading(**section_dict)
+    section_dict["path"] = path
+    section_path = join(path, "section.yaml")
     if not section.is_stitched():
-        section.load_from_yaml()
+        section.load_from_yaml(section_path)
         if not exists(
             join(
-                section.get_sample().get_experiment().get_root_dir(),
-                section.get_sample().get_experiment().get_name(),
-                section.get_sample().get_name(),
-                section.get_name(),
+                path,
                 "meshes.npz",
             )
         ):
             logger.info("Mesh not found. Please run tile-registration first.")
-            return None
+            return False
 
         logger.info(f"Warp section {section.get_name()}.")
         warped_tiles, mask = render_tiles(
             section=section,
+            section_dir=path,
             stride=stride,
             margin=margin,
             parallelism=32,
@@ -151,6 +174,7 @@ def warp_and_save(
         )
 
         if warped_tiles is not None:
+            volume = Volume.load(volume_path)
             if len(volume._section_list) == 0:
                 logger.info("First section insert at [0, 0, 0].")
                 volume.write_section(
@@ -159,11 +183,10 @@ def warp_and_save(
                     offsets=tuple([0, 0, 0]),
                 )
             else:
-                zeroth_section_num = volume._section_list[0]
-                zeroth_section = sample.get_section(
-                    f"s{zeroth_section_num}_" f"g{tile_grid_num}"
-                )
-                zeroth_section.load_from_yaml()
+                zs_path = zeroth_section_dict.pop("path")
+                zeroth_section = Section.lazy_loading(**zeroth_section_dict)
+                zeroth_section_path = join(zs_path, "section.yaml")
+                zeroth_section.load_from_yaml(zeroth_section_path)
 
                 zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
                 current_section_stage_coords = get_section_stage_coords(section)
@@ -185,13 +208,10 @@ def warp_and_save(
                 f"Section {section.get_name()} successfully stitched and saved."
             )
             section._stitched = True
+            volume.save()
+            return True
 
-    return volume
-
-
-@task()
-def get_volume(exp: Experiment, sample_name: str):
-    return Volume.load(exp.get_sample(sample_name).get_aligned_data())
+    return False
 
 
 @flow(
@@ -251,7 +271,7 @@ def warp_sections_flow(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing"), params=params
     )
 
-    sections = get_sections.submit(
+    section_dicts = get_sections.submit(
         exp=exp,
         sample_name=exp_config.sample_name,
         acquisition=exp_config.acquisition,
@@ -260,15 +280,35 @@ def warp_sections_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
-    volume = get_volume.submit(exp=exp, sample_name=exp_config.sample_name).result()
-
-    for section in sections:
+    for section in section_dicts:
+        volume = Volume.load(exp.get_sample(exp_config.sample_name).get_aligned_data())
+        if len(volume._section_list) > 0:
+            zeroth_section_num = volume._section_list[0]
+            zeroth_section = exp.get_sample(exp_config.sample_name).get_section(
+                f"s{zeroth_section_num}_" f"g{exp_config.tile_grid_num}"
+            )
+            zeroth_section_dict = {
+                "name": zeroth_section.get_name(),
+                "stitched": zeroth_section.is_stitched(),
+                "skip": zeroth_section.skip(),
+                "acquisition": zeroth_section.get_acquisition(),
+                "section_num": zeroth_section.get_section_num(),
+                "tile_grid_num": zeroth_section.get_tile_grid_num(),
+                "details": "",
+                "path": join(
+                    zeroth_section.get_sample().get_experiment().get_root_dir(),
+                    zeroth_section.get_sample().get_experiment().get_name(),
+                    zeroth_section.get_sample().get_name(),
+                    zeroth_section.get_name(),
+                ),
+            }
+        else:
+            zeroth_section_dict = None
         try:
-            volume = warp_and_save.submit(
-                sample=exp.get_sample(exp_config.sample_name),
-                tile_grid_num=exp_config.tile_grid_num,
-                section=section,
-                volume=volume,
+            stitched = warp_and_save.submit(
+                section_dict=section,
+                zeroth_section_dict=zeroth_section_dict,
+                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
                 stride=warp_config.stride,
                 margin=warp_config.margin,
                 use_clahe=warp_config.use_clahe,
@@ -280,11 +320,10 @@ def warp_sections_flow(
             ).result()
         except prefect.exceptions.CrashedRun:
             # Re-submit if slurm node changes.
-            volume = warp_and_save.submit(
-                sample=exp.get_sample(exp_config.sample_name),
-                tile_grid_num=exp_config.tile_grid_num,
-                section=section,
-                volume=volume,
+            stitched = warp_and_save.submit(
+                section_dict=section,
+                zeroth_section_dict=zeroth_section_dict,
+                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
                 stride=warp_config.stride,
                 margin=warp_config.margin,
                 use_clahe=warp_config.use_clahe,
@@ -296,10 +335,9 @@ def warp_sections_flow(
             ).result()
 
         exp.get_sample(exp_config.sample_name).get_section(
-            section.get_name()
-        )._stitched = (volume is not None)
+            section["name"]
+        )._stitched = stitched
         exp.save(overwrite=True)
-        volume.save()
 
     commit_changes.submit(
         exp=exp,
