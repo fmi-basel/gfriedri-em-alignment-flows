@@ -35,16 +35,38 @@ def get_sections(
     logger.info(f"Sample: {sample_name} of acquisition {acquisition}")
     logger.info(f"Retrieving sections {start_section_num} to " f"{end_section_num}.")
     if start_section_num is not None and end_section_num is not None:
-        return exp.get_sample(sample_name).get_section_range(
+        sections = exp.get_sample(sample_name).get_section_range(
             start_section_num=start_section_num,
             end_section_num=end_section_num,
             tile_grid_num=tile_grid_num,
             include_skipped=False,
         )
     else:
-        return exp.get_sample(sample_name).get_sections_of_acquisition(
+        sections = exp.get_sample(sample_name).get_sections_of_acquisition(
             acquisition=acquisition, tile_grid_num=tile_grid_num, include_skipped=False
         )
+
+    section_paths = []
+    path = join(
+        sections[0].get_sample().get_experiment().get_root_dir(),
+        sections[0].get_sample().get_experiment().get_name(),
+        sections[0].get_sample().get_name(),
+    )
+    for s in sections:
+        section_paths.append(
+            {
+                "name": s.get_name(),
+                "stitched": s.is_stitched(),
+                "skip": s.skip(),
+                "acquisition": s.get_acquisition(),
+                "section_num": s.get_section_num(),
+                "tile_grid_num": s.get_tile_grid_num(),
+                "details": "",
+                "path": join(path, s.get_name()),
+            }
+        )
+
+    return section_paths
 
 
 @task()
@@ -132,7 +154,7 @@ def tile_registration_flow(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing"), params=params
     )
 
-    sections = get_sections.submit(
+    section_paths = get_sections.submit(
         exp=exp,
         sample_name=exp_config.sample_name,
         acquisition=exp_config.acquisition,
@@ -141,7 +163,7 @@ def tile_registration_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
-    logger.info(f"Found {len(sections)} sections.")
+    logger.info(f"Found {len(section_paths)} sections.")
 
     integration_config = build_integration_config.submit(
         dt=mesh_integration_config.dt,
@@ -160,7 +182,7 @@ def tile_registration_flow(
     )
 
     meshes = run_sofima.map(
-        sections,
+        section_dict=section_paths,
         stride=unmapped(mesh_integration_config.stride),
         overlaps_x=unmapped(tuple(registration_config.overlaps_x)),
         overlaps_y=unmapped(tuple(registration_config.overlaps_y)),
