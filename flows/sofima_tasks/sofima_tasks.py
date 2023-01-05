@@ -48,7 +48,7 @@ def run_sofima(
         try:
             register_tiles(
                 section,
-                section_dir=path,
+                section_dir=join(path, section.get_name()),
                 stride=stride,
                 overlaps_x=overlaps_x,
                 overlaps_y=overlaps_y,
