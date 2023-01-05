@@ -18,6 +18,7 @@ def run_sofima(
     overlaps_x: tuple,
     overlaps_y: tuple,
     min_overlap: int,
+    min_range: tuple = (10, 100, 0),
     patch_size: tuple = (120, 120),
     batch_size: int = 8000,
     min_peak_ratio: float = 1.4,
@@ -31,7 +32,7 @@ def run_sofima(
 ):
     path = section_dict.pop("path")
     section = Section.lazy_loading(**section_dict)
-    section_path = join(path, "section.yaml")
+    section_path = join(path, section.get_name(), "section.yaml")
     section.load_from_yaml(section_path)
     logger = get_run_logger()
     logger.info(f"Compute mesh for section {section_path}.")
@@ -47,11 +48,12 @@ def run_sofima(
         try:
             register_tiles(
                 section,
-                section_dir=path,
+                section_dir=join(path, section.get_name()),
                 stride=stride,
                 overlaps_x=overlaps_x,
                 overlaps_y=overlaps_y,
                 min_overlap=min_overlap,
+                min_range=min_range,
                 patch_size=patch_size,
                 batch_size=batch_size,
                 min_peak_ratio=min_peak_ratio,
