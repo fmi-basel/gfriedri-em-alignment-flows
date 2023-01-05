@@ -31,7 +31,7 @@ def run_sofima(
 ):
     path = section_dict.pop("path")
     section = Section.lazy_loading(**section_dict)
-    section_path = join(path, "section.yaml")
+    section_path = join(path, section.get_name(), "section.yaml")
     section.load_from_yaml(section_path)
     logger = get_run_logger()
     logger.info(f"Compute mesh for section {section_path}.")

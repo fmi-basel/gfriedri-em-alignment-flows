@@ -64,7 +64,7 @@ def get_sections(
                     "section_num": s.get_section_num(),
                     "tile_grid_num": s.get_tile_grid_num(),
                     "details": "",
-                    "path": join(path, s.get_name()),
+                    "path": path,
                 }
             )
 
@@ -150,12 +150,13 @@ def warp_and_save(
     path = section_dict.pop("path")
     section = Section.lazy_loading(**section_dict)
     section_dict["path"] = path
-    section_path = join(path, "section.yaml")
+    section_path = join(path, section.get_name(), "section.yaml")
     if not section.is_stitched():
         section.load_from_yaml(section_path)
         if not exists(
             join(
                 path,
+                section.get_name(),
                 "meshes.npz",
             )
         ):
@@ -165,7 +166,7 @@ def warp_and_save(
         logger.info(f"Warp section {section.get_name()}.")
         warped_tiles, mask = render_tiles(
             section=section,
-            section_dir=path,
+            section_dir=join(path, section.get_name()),
             stride=stride,
             margin=margin,
             parallelism=32,
@@ -185,7 +186,9 @@ def warp_and_save(
             else:
                 zs_path = zeroth_section_dict.pop("path")
                 zeroth_section = Section.lazy_loading(**zeroth_section_dict)
-                zeroth_section_path = join(zs_path, "section.yaml")
+                zeroth_section_path = join(
+                    zs_path, zeroth_section.get_name(), "section.yaml"
+                )
                 zeroth_section.load_from_yaml(zeroth_section_path)
 
                 zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
@@ -299,7 +302,6 @@ def warp_sections_flow(
                     zeroth_section.get_sample().get_experiment().get_root_dir(),
                     zeroth_section.get_sample().get_experiment().get_name(),
                     zeroth_section.get_sample().get_name(),
-                    zeroth_section.get_name(),
                 ),
             }
         else:

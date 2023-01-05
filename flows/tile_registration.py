@@ -62,7 +62,7 @@ def get_sections(
                 "section_num": s.get_section_num(),
                 "tile_grid_num": s.get_tile_grid_num(),
                 "details": "",
-                "path": join(path, s.get_name()),
+                "path": path,
             }
         )
 
