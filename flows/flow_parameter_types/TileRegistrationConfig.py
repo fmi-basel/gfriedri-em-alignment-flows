@@ -23,6 +23,7 @@ class RegistrationConfig(BaseModel):
     overlaps_x: List[int] = [200, 300, 400]
     overlaps_y: List[int] = [200, 300, 400]
     min_overlap: int = 20
+    min_range: List[int] = [10, 100, 0]
     patch_size: List[int] = [80, 80]
     batch_size: int = 8000
     min_peak_ratio: float = 1.4

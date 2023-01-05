@@ -187,6 +187,7 @@ def tile_registration_flow(
         overlaps_x=unmapped(tuple(registration_config.overlaps_x)),
         overlaps_y=unmapped(tuple(registration_config.overlaps_y)),
         min_overlap=unmapped(registration_config.min_overlap),
+        min_range=unmapped(tuple(registration_config.min_range)),
         patch_size=unmapped(tuple(registration_config.patch_size)),
         batch_size=unmapped(registration_config.batch_size),
         min_peak_ratio=unmapped(registration_config.min_peak_ratio),
