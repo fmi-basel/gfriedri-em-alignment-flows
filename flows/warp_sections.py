@@ -169,7 +169,7 @@ def warp_and_save(
             section_dir=join(path, section.get_name()),
             stride=stride,
             margin=margin,
-            parallelism=32,
+            parallelism=48,
             use_clahe=use_clahe,
             clahe_kwargs=clahe_kwargs,
         )
@@ -224,7 +224,7 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "cpu_long",
-            "cores": 32,
+            "cores": 48,
             "processes": 1,
             "memory": "32 GB",
             "walltime": "24:00:00",
