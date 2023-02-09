@@ -13,6 +13,10 @@ prefect deployment build flows/tile_registration.py:tile_registration_flow -n "t
 prefect deployment build flows/warp_sections.py:warp_sections_flow -n "warp-sections" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/warp_sections.yaml -ib process/slurm-gfriedri-em-alignment-flows
 
 prefect deployment build flows/fine_alignment.py:flow_field_estimation -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/fine_alignment_ffe.yaml -ib process/gfriedri-estimate-flow-field-3d
+
+prefect deployment build flows/fine_alignment.py:parallel_flow_field_estimation -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/fine_alignment_pffe.yaml -ib process/slurm-gfriedri-em-alignment-flows
+
+prefect deployment build flows/fine_alignment.py:optimize_mesh -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/optimize_mesh.yaml -ib process/gfriedri-estimate-flow-field-3d
 ```
 
 # Deploy
