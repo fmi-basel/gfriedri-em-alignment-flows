@@ -80,8 +80,8 @@ def compute_flow_field(
     finally:
         gpu_sem.release()
 
-    prev_data_bin2 = block_reduce(prev_data, func=np.mean)
-    curr_data_bin2 = block_reduce(curr_data, func=np.mean)
+    prev_data_bin2 = block_reduce(prev_data, func=np.mean).astype(np.float32)
+    curr_data_bin2 = block_reduce(curr_data, func=np.mean).astype(np.float32)
 
     try:
         gpu_sem.acquire()
