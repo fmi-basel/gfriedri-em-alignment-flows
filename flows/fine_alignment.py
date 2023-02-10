@@ -1,5 +1,5 @@
+import gc
 import os
-import sys
 import threading
 from os.path import join
 from pathlib import Path
@@ -56,13 +56,15 @@ def compute_flow_field(
 ):
     logger = get_run_logger()
     mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
-    logger.info(f"Process memory usage: {mem_usage} GB")
+    logger.info(f"[Start] Process memory usage: {mem_usage} GB")
 
     prev_data = np.squeeze(prev.get_data())
     curr_data = np.squeeze(curr.get_data())
 
-    logger.info(f"prev_data-size: {sys.getsizeof(prev_data) / 1e+9} GB")
-    logger.info(f"curr_data-size: {sys.getsizeof(curr_data) / 1e+9} GB")
+    logger.info(
+        f"prev_data-size: " f"{(prev_data.size * prev_data.itemsize) / 1e+9} GB"
+    )
+    logger.info(f"curr_data-size: " f"{curr_data.size * curr_data.itemsize / 1e+9} GB")
 
     try:
         gpu_sem.acquire()
@@ -94,6 +96,16 @@ def compute_flow_field(
         raise e
     finally:
         gpu_sem.release()
+
+    del prev_data
+    del prev_data_bin2
+    del curr_data
+    del curr_data_bin2
+    prev._data = None
+    curr._data = None
+    gc.collect()
+    mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
+    logger.info(f"[End] Process memory usage: {mem_usage} GB")
 
     os.makedirs(join(out_dir, str(z)), exist_ok=True)
     ff1x = NumpyTarget.from_path(join(out_dir, str(z), f"flows1x_{z - 1}_to_{z}.npy"))
