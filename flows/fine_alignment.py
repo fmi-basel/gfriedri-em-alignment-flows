@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 from os.path import join
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import jax.numpy as jnp
 import numpy as np
+import psutil
 from connectomics.common import bounding_box
 from cpr.numpy.NumpyTarget import NumpyTarget
 from cpr.Serializer import cpr_serializer
@@ -52,8 +54,15 @@ def compute_flow_field(
     batch_size,
     gpu_sem: threading.Semaphore,
 ):
+    logger = get_run_logger()
+    mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
+    logger.info(f"Process memory usage: {mem_usage} GB")
+
     prev_data = np.squeeze(prev.get_data())
     curr_data = np.squeeze(curr.get_data())
+
+    logger.info(f"prev_data-size: {sys.getsizeof(prev_data) / 1e+9} GB")
+    logger.info(f"curr_data-size: {sys.getsizeof(curr_data) / 1e+9} GB")
 
     try:
         gpu_sem.acquire()
@@ -422,7 +431,9 @@ def parallel_flow_field_estimation(
     parallelization: int = 2,
     refresh_cache: bool = False,
 ):
+    # TODO: Free up memory!
     if refresh_cache:
+        # This does not work!
         os.environ["PREFECT_TASKS_REFRESH_CACHE"] = "true"
     n_sections = end_section - start_section
     split = n_sections // parallelization
