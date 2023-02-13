@@ -305,11 +305,6 @@ def run_mesh_optimization(
 
     solved = np.concatenate(solved, axis=1)
 
-    # box1x = bounding_box.BoundingBox(
-    #     start=(0, 0, 0), size=(final_flow.shape[-1], final_flow.shape[-2], 1)
-    # )
-    # inv_map = map_utils.invert_map(solved, box1x, box1x, stride)
-
     outputs = []
     for z in range(1, solved.shape[1]):
         out = NumpyTarget.from_path(join(out_dir, f"map_{z}.npy"))
@@ -373,14 +368,14 @@ def optimize_mesh(
         out_dir=out_dir,
     )
 
-    inv_maps = run_mesh_optimization(
+    maps = run_mesh_optimization(
         flow=final_flow,
         out_dir=out_dir,
         stride=stride,
         integration_config=integration_config,
     )
 
-    return inv_maps
+    return maps
 
 
 @task(cache_key_fn=task_input_hash)
