@@ -438,10 +438,6 @@ def parallel_flow_field_estimation(
     parallelization: int = 2,
     refresh_cache: bool = False,
 ):
-    # TODO: Free up memory!
-    if refresh_cache:
-        # This does not work!
-        os.environ["PREFECT_TASKS_REFRESH_CACHE"] = "true"
     n_sections = end_section - start_section
     split = n_sections // parallelization
     start = start_section
@@ -510,9 +506,23 @@ def parallel_flow_field_estimation(
         client=get_client(),
     )
 
-    inv_maps = run.state.result()
+    map_dicts = [m.serialize() for m in run.state.result()]
 
-    return inv_maps
+    run: FlowRun = run_deployment(
+        name="Warp volume/default",
+        parameters={
+            "source_volume": path,
+            "target_volume": "/tungstenfs/scratch/gmicro_sem/gmicro/buchtimo/20220524_Bo_juv20210731_test_volume/aligned_volume.zarr",
+            "start_section": start_section,
+            "end_section": end_section,
+            "map_dicts": map_dicts,
+            "stride": stride,
+            "parallelization": 20,
+        },
+        client=get_client(),
+    )
+
+    return run.state.result()
 
 
 if __name__ == "__main__":

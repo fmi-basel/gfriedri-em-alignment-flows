@@ -106,7 +106,7 @@ def warp_section(
         slices_start=[z],
         slices_stop=[z + 1],
     )
-    # TODO: Compute histogram
+
     return result
 
 
