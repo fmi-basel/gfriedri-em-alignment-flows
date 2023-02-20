@@ -1,12 +1,15 @@
 import gc
+import json
 import os
 import threading
+from datetime import datetime
 from os.path import join
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import jax.numpy as jnp
 import numpy as np
+import pkg_resources
 import psutil
 from connectomics.common import bounding_box
 from cpr.numpy.NumpyTarget import NumpyTarget
@@ -15,13 +18,47 @@ from cpr.utilities.utilities import task_input_hash
 from cpr.zarr.ZarrSource import ZarrSource
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
-from prefect.context import TaskRunContext
+from prefect.context import FlowRunContext, TaskRunContext, get_run_context
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
 from pydantic import BaseModel
 from skimage.measure import block_reduce
 from sofima import flow_field, flow_utils, map_utils, mesh
 from tqdm.auto import tqdm
+
+
+class MeshIntegrationConfig(BaseModel):
+    dt: float = 0.001
+    gamma: float = 0.0
+    k0: float = 0.01
+    k: float = 0.1
+    num_iters: int = 1000
+    max_iters: int = 100000
+    stop_v_max: float = 0.005
+    dt_max: float = 1000
+    start_cap: float = 0.01
+    final_cap: float = 10
+    prefer_orig_order: bool = True
+
+
+class FlowComputationConfig(BaseModel):
+    patch_size: int = 160
+    stride: int = 40
+    batch_size: int = 256
+    min_peak_ratio: float = 1.6
+    min_peak_sharpness: float = 1.6
+    max_magnitude: float = 80
+    max_deviation: float = 20
+    max_gradient: float = 0
+    min_patch_size: int = 400
+    integration_config: MeshIntegrationConfig = MeshIntegrationConfig()
+    chunk_size: int = 100
+    parallelization: int = 16
+
+
+class WarpConfig(BaseModel):
+    target_volume_name: str
+    parallelization: int = 16
 
 
 @task(cache_key_fn=task_input_hash)
@@ -254,20 +291,6 @@ def compute_final_flow(
     return output
 
 
-class MeshIntegrationConfig(BaseModel):
-    dt: float = 0.001
-    gamma: float = 0.0
-    k0: float = 0.01
-    k: float = 0.1
-    num_iters: int = 1000
-    max_iters: int = 100000
-    stop_v_max: float = 0.005
-    dt_max: float = 1000
-    start_cap: float = 0.01
-    final_cap: float = 10
-    prefer_orig_order: bool = True
-
-
 @task(cache_key_fn=task_input_hash)
 def run_mesh_optimization(
     flow: NumpyTarget,
@@ -412,48 +435,96 @@ def submit_flows(
     return flows1x, flows2x
 
 
+def write_alignment_info(
+    path: str,
+    coarse_volume_path: str,
+    start_section: int,
+    end_section: int,
+    result_dir: str,
+    flow_config: FlowComputationConfig,
+    warp_config: WarpConfig,
+    context: FlowRunContext,
+):
+    params = {
+        "coarse_volume_path": coarse_volume_path,
+        "start_section": start_section,
+        "end_section": end_section,
+        "result_dir": result_dir,
+        "flow_config": flow_config.dict(),
+        "warp_config": warp_config.dict(),
+    }
+    context = {
+        "start_time": context.flow_run.start_time.strftime("%Y-%m-%d " "%H:%M:%S"),
+        "flow_id": context.flow_run.flow_id,
+        "flow_run_id": context.flow_run.id,
+        "flow_run_version": context.flow_run.flow_version,
+        "flow_run_name": context.flow_run.name,
+        "deployment_id": context.flow_run.deployment_id,
+    }
+    date = datetime.now().strftime("%Y/%m/%d, %H:%M:%S")
+    sofima_version = pkg_resources.get_distribution("sofima").version
+    content = (
+        "# Warp volume\n"
+        "Source: [https://github.com/fmi-basel/gfriedri-em-alignment"
+        "-flows](https://github.com/fmi-basel/gfriedri-em-alignment"
+        "-flows)\n"
+        f"Date: {date}\n"
+        "\n"
+        "## Summary\n"
+        "The fine-aligned volume "
+        f"{join(result_dir, warp_config.target_volume_name)} was "
+        "computed with [SOFIMA]("
+        "https://github.com/google-research/sofima).\n"
+        "\n"
+        "## Parameters\n"
+        f"{json.dumps(params, indent=4)}\n"
+        "\n"
+        "## Packages\n"
+        f"* [https://github.com/google-research/sofima]("
+        f"https://github.com/google-research/sofima): {sofima_version}\n"
+        f"\n"
+        f"## Prefect Context\n"
+        f"{json.dumps(context, indent=4)}\n"
+    )
+
+    with open(path, "w") as f:
+        f.write(content)
+
+
 @flow(
-    name="Estimate flow-field (parallel)",
+    name="Volume fine-alignment",
     persist_result=True,
     result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
 )
 def parallel_flow_field_estimation(
-    path: Path = "/path/to/volume",
+    coarse_volume_path: Path = "/path/to/volume",
     start_section: int = 0,
     end_section: int = 1000,
-    out_dir: Path = "/path/to/flow_field_storage",
-    patch_size: int = 160,
-    stride: int = 40,
-    batch_size: int = 256,
-    min_peak_ratio: float = 1.6,
-    min_peak_sharpness: float = 1.6,
-    max_magnitude: float = 80,
-    max_deviation: float = 20,
-    max_gradient: float = 0,
-    min_patch_size: int = 400,
-    integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
-    chunk_size: int = 100,
-    parallelization: int = 2,
-    refresh_cache: bool = False,
+    result_dir: Path = "/path/to/flow_field_storage",
+    flow_config: FlowComputationConfig = FlowComputationConfig(),
+    warp_config: WarpConfig = WarpConfig(),
 ):
     n_sections = end_section - start_section
-    split = n_sections // parallelization
+    split = n_sections // flow_config.parallelization
     start = start_section
 
+    flow_dir = join(result_dir, "flow-fields")
+    os.makedirs(flow_dir, exist_ok=True)
+
     runs = []
-    for i in range(parallelization - 1):
+    for i in range(flow_config.parallelization - 1):
         runs.append(
             submit_flows.submit(
                 start_section=start,
                 end_section=start + split,
-                chunk_size=chunk_size,
-                path=path,
-                out_dir=join(out_dir, "flow-fields"),
-                patch_size=patch_size,
-                stride=stride,
-                batch_size=batch_size,
+                chunk_size=flow_config.chunk_size,
+                path=coarse_volume_path,
+                out_dir=flow_dir,
+                patch_size=flow_config.patch_size,
+                stride=flow_config.stride,
+                batch_size=flow_config.batch_size,
             )
         )
         start = start + split
@@ -462,12 +533,12 @@ def parallel_flow_field_estimation(
         submit_flows.submit(
             start_section=start,
             end_section=end_section,
-            chunk_size=chunk_size,
-            path=path,
-            out_dir=join(out_dir, "flow-fields"),
-            patch_size=patch_size,
-            stride=stride,
-            batch_size=batch_size,
+            chunk_size=flow_config.chunk_size,
+            path=coarse_volume_path,
+            out_dir=flow_dir,
+            patch_size=flow_config.patch_size,
+            stride=flow_config.stride,
+            batch_size=flow_config.batch_size,
         )
     )
 
@@ -483,22 +554,23 @@ def parallel_flow_field_estimation(
         serialized_f1x.append(f1.serialize())
         serialized_f2x.append(f2.serialize())
 
+    map_dir = join(result_dir, "maps")
+    os.makedirs(map_dir, exist_ok=True)
+
     opt_mesh_parameters = {
         "flows_1x_dicts": serialized_f1x,
         "flows_2x_dicts": serialized_f2x,
-        "out_dir": join(out_dir, "maps"),
-        "patch_size": patch_size,
-        "stride": stride,
-        "min_peak_ratio": min_peak_ratio,
-        "min_peak_sharpness": min_peak_sharpness,
-        "max_magnitude": max_magnitude,
-        "max_deviation": max_deviation,
-        "max_gradient": max_gradient,
-        "min_patch_size": min_patch_size,
-        "integration_config": integration_config,
+        "out_dir": map_dir,
+        "patch_size": flow_config.patch_size,
+        "stride": flow_config.stride,
+        "min_peak_ratio": flow_config.min_peak_ratio,
+        "min_peak_sharpness": flow_config.min_peak_sharpness,
+        "max_magnitude": flow_config.max_magnitude,
+        "max_deviation": flow_config.max_deviation,
+        "max_gradient": flow_config.max_gradient,
+        "min_patch_size": flow_config.min_patch_size,
+        "integration_config": flow_config.integration_config,
     }
-
-    get_run_logger().info(opt_mesh_parameters)
 
     run: FlowRun = run_deployment(
         name="Optimize mesh/default",
@@ -511,18 +583,31 @@ def parallel_flow_field_estimation(
     run: FlowRun = run_deployment(
         name="Warp volume/default",
         parameters={
-            "source_volume": path,
-            "target_volume": "/tungstenfs/scratch/gmicro_sem/gmicro/buchtimo/20220524_Bo_juv20210731_test_volume/aligned_volume.zarr",
+            "source_volume": coarse_volume_path,
+            "target_volume": join(result_dir, warp_config.target_volume_name),
             "start_section": start_section,
             "end_section": end_section,
             "map_dicts": map_dicts,
-            "stride": stride,
-            "parallelization": 20,
+            "stride": flow_config.stride,
+            "parallelization": warp_config.parallelization,
         },
         client=get_client(),
     )
 
-    return run.state.result()
+    warped_sections = run.state.result()
+
+    write_alignment_info(
+        path=join(result_dir, warp_config.target_volume_name, "summary.md"),
+        coarse_volume_path=coarse_volume_path,
+        start_section=start_section,
+        end_section=end_section,
+        result_dir=result_dir,
+        flow_config=flow_config,
+        warp_config=warp_config,
+        context=get_run_context(),
+    )
+
+    return warped_sections
 
 
 if __name__ == "__main__":
