@@ -129,28 +129,21 @@ def warp_sections(
     target_volume = ZarrSource(**target_volume_dict)
     maps = [NumpyTarget(**d) for d in map_dicts]
 
-    buffer = []
     if start_section == 0:
-        buffer.append(
-            copy_first_section.submit(source_volume, target_volume, z=start_section)
-        )
+        copy_first_section(source_volume, target_volume, z=start_section)
         start_section = 1
 
     warped_sections = []
     for i, z in enumerate(range(start_section, end_section)):
-        warp_task = warp_section.submit(
-            source_volume,
-            target_zarr=target_volume,
-            z=z,
-            map=maps[i],
-            stride=stride,
+        warped_sections.append(
+            warp_section(
+                source_volume,
+                target_zarr=target_volume,
+                z=z,
+                map=maps[i],
+                stride=stride,
+            )
         )
-        buffer.append(warp_task)
-        while len(buffer) >= 2:
-            warped_sections.append(buffer.pop(0).result())
-
-    while len(buffer) > 0:
-        warped_sections.append(buffer.pop(0).result())
 
     return warped_sections
 
@@ -164,15 +157,16 @@ def submit_flows(
     map_dicts: List[dict],
     stride: float,
 ):
+    n_sections_per_job = 25
     warped_sections = []
-    for z in range(start_section, end_section, 10):
+    for z in range(start_section, end_section, n_sections_per_job):
         run: FlowRun = run_deployment(
             name="Warp sections/default",
             parameters={
                 "source_volume_dict": source_volume_dict,
                 "target_volume_dict": target_volume_dict,
                 "start_section": z,
-                "end_section": min(z + 10, end_section),
+                "end_section": min(z + n_sections_per_job, end_section),
                 "map_dicts": map_dicts,
                 "stride": stride,
             },
