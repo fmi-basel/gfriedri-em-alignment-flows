@@ -487,7 +487,7 @@ def write_alignment_info(
         f"https://github.com/google-research/sofima): {sofima_version}\n"
         f"\n"
         f"## Prefect Context\n"
-        f"{json.dumps(context, indent=4)}\n"
+        f"{str(context)}\n"
     )
 
     with open(path, "w") as f:
