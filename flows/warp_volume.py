@@ -158,7 +158,7 @@ def warp_sections(
                 source_volume,
                 target_zarr=target_volume,
                 yx_start=yx_start,
-                yx_end=yx_size,
+                yx_size=yx_size,
                 z=z,
                 map=maps[i],
                 stride=stride,

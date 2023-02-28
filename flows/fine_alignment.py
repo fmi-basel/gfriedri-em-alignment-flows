@@ -592,7 +592,7 @@ def parallel_flow_field_estimation(
             "start_section": start_section,
             "end_section": end_section,
             "yx_start": warp_config.yx_start,
-            "yx_end": warp_config.yx_size,
+            "yx_size": warp_config.yx_size,
             "map_dicts": map_dicts,
             "stride": flow_config.stride,
             "parallelization": warp_config.parallelization,
