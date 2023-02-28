@@ -57,8 +57,8 @@ class FlowComputationConfig(BaseModel):
 
 class WarpConfig(BaseModel):
     target_volume_name: str = "warped_zyx.zarr"
-    yx_start: tuple[int, int] = tuple([1000, 2000])
-    yx_size: tuple[int, int] = tuple([1000, 1000])
+    yx_start: list[int] = list([1000, 2000])
+    yx_size: list[int] = list([1000, 1000])
     parallelization: int = 16
 
 
