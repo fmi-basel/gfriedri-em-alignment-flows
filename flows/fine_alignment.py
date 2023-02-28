@@ -57,7 +57,7 @@ class FlowComputationConfig(BaseModel):
 
 
 class WarpConfig(BaseModel):
-    target_volume_name: str
+    target_volume_name: str = "warped_zyx.zarr"
     parallelization: int = 16
 
 
