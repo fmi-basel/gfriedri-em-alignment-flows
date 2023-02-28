@@ -34,6 +34,7 @@ def create_output_volume(source_volume: Path, target_volume: Path):
         order=source_zarr.order,
         overwrite=True,
     )
+    # TODO: write zattrs with spacing information.
 
     return ZarrSource.from_path(target_volume, group="0", mode="w")
 
@@ -52,6 +53,8 @@ def copy_first_section(
 def warp_section(
     source_volume: ZarrSource,
     target_zarr: ZarrSource,
+    yx_start: tuple[int, int],
+    yx_size: tuple[int, int],
     z: int,
     map: NumpyTarget,
     stride: float,
@@ -67,12 +70,16 @@ def warp_section(
     out_vol = target_zarr.get_data()
 
     tile_size = 20000
-    for y in range(0, section_data.shape[1], tile_size):
-        for x in range(0, section_data.shape[2], tile_size):
+    for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
+        for x in range(yx_start[1], yx_start[1] + yx_size[1], tile_size):
             src_start_y = max(0, y - 500)
             src_start_x = max(0, x - 500)
-            src_end_y = min(y + tile_size + 500, section_data.shape[1])
-            src_end_x = min(x + tile_size + 500, section_data.shape[2])
+            src_end_y = min(
+                min(y + tile_size + 500, y + yx_size[0] + 500), section_data.shape[1]
+            )
+            src_end_x = min(
+                min(x + tile_size + 500, x + yx_size[1] + 500), section_data.shape[2]
+            )
             src_data = section_data[
                 z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
             ][np.newaxis]
@@ -81,13 +88,20 @@ def warp_section(
                 start=(src_start_x, src_start_y, 0),
                 size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
             )
-            end_y = min(y + tile_size, section_data.shape[1])
-            end_x = min(x + tile_size, section_data.shape[2])
+
+            end_y = min(min(y + tile_size, y + yx_size[0]), section_data.shape[1])
+            end_x = min(min(x + tile_size, x + yx_size[1]), section_data.shape[2])
             out_box = bounding_box.BoundingBox(
                 start=(x, y, 0), size=(end_x - x, end_y - y, 1)
             )
 
-            out_vol[z, y:end_y, x:end_x] = warp.warp_subvolume(
+            out_start_y = min(y, y - yx_start[0])
+            out_start_x = min(x, x - yx_start[1])
+            out_end_y = min(end_y, end_y - yx_start[0])
+            out_end_x = min(end_x, end_x - yx_start[1])
+            out_vol[
+                z, out_start_y:out_end_y, out_start_x:out_end_x
+            ] = warp.warp_subvolume(
                 src_data,
                 image_box=img_box,
                 coord_map=inv_map,
@@ -96,7 +110,9 @@ def warp_section(
                 out_box=out_box,
                 interpolation="lanczos",
                 parallelism=1,
-            )[0, 0]
+            )[
+                0, 0
+            ]
 
             gc.collect()
 
@@ -122,6 +138,8 @@ def warp_sections(
     target_volume_dict: dict,
     start_section: int,
     end_section: int,
+    yx_start: tuple[int, int],
+    yx_size: tuple[int, int],
     map_dicts: List[dict],
     stride: float,
 ):
@@ -139,6 +157,8 @@ def warp_sections(
             warp_section(
                 source_volume,
                 target_zarr=target_volume,
+                yx_start=yx_start,
+                yx_end=yx_size,
                 z=z,
                 map=maps[i],
                 stride=stride,
@@ -154,6 +174,8 @@ def submit_flows(
     target_volume_dict: dict,
     start_section: int,
     end_section: int,
+    yx_start: tuple[int, int],
+    yx_size: tuple[int, int],
     map_dicts: List[dict],
     stride: float,
 ):
@@ -167,6 +189,8 @@ def submit_flows(
                 "target_volume_dict": target_volume_dict,
                 "start_section": z,
                 "end_section": min(z + n_sections_per_job, end_section),
+                "yx_start": yx_start,
+                "yx_size": yx_size,
                 "map_dicts": map_dicts,
                 "stride": stride,
             },
@@ -189,6 +213,8 @@ def warp_volume(
     target_volume: Path,
     start_section: int,
     end_section: int,
+    yx_start: tuple[int, int],
+    yx_size: tuple[int, int],
     map_dicts: List[dict],
     stride: float,
     parallelization: int = 5,
@@ -215,6 +241,8 @@ def warp_volume(
                 target_volume_dict=warped_zarr.serialize(),
                 start_section=start,
                 end_section=start + split,
+                yx_start=yx_start,
+                yx_size=yx_size,
                 map_dicts=maps,
                 stride=stride,
             )
@@ -227,6 +255,8 @@ def warp_volume(
             target_volume_dict=warped_zarr.serialize(),
             start_section=start,
             end_section=end_section + 1,
+            yx_start=yx_start,
+            yx_size=yx_size,
             map_dicts=map_dicts[start - 1 :],
             stride=stride,
         )

@@ -51,13 +51,14 @@ class FlowComputationConfig(BaseModel):
     max_deviation: float = 20
     max_gradient: float = 0
     min_patch_size: int = 400
-    integration_config: MeshIntegrationConfig = MeshIntegrationConfig()
     chunk_size: int = 100
     parallelization: int = 16
 
 
 class WarpConfig(BaseModel):
     target_volume_name: str = "warped_zyx.zarr"
+    yx_start: tuple[int, int] = tuple([1000, 2000])
+    yx_size: tuple[int, int] = tuple([1000, 1000])
     parallelization: int = 16
 
 
@@ -442,15 +443,17 @@ def write_alignment_info(
     end_section: int,
     result_dir: str,
     flow_config: FlowComputationConfig,
+    integration_config: MeshIntegrationConfig,
     warp_config: WarpConfig,
     context: FlowRunContext,
 ):
     params = {
-        "coarse_volume_path": coarse_volume_path,
+        "coarse_volume_path": str(coarse_volume_path),
         "start_section": start_section,
         "end_section": end_section,
-        "result_dir": result_dir,
+        "result_dir": str(result_dir),
         "flow_config": flow_config.dict(),
+        "integration_config": integration_config.dict(),
         "warp_config": warp_config.dict(),
     }
     context = {
@@ -504,6 +507,7 @@ def parallel_flow_field_estimation(
     end_section: int = 1000,
     result_dir: Path = "/path/to/flow_field_storage",
     flow_config: FlowComputationConfig = FlowComputationConfig(),
+    integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
     warp_config: WarpConfig = WarpConfig(),
 ):
     n_sections = end_section - start_section
@@ -569,7 +573,7 @@ def parallel_flow_field_estimation(
         "max_deviation": flow_config.max_deviation,
         "max_gradient": flow_config.max_gradient,
         "min_patch_size": flow_config.min_patch_size,
-        "integration_config": flow_config.integration_config,
+        "integration_config": integration_config,
     }
 
     run: FlowRun = run_deployment(
@@ -587,6 +591,8 @@ def parallel_flow_field_estimation(
             "target_volume": join(result_dir, warp_config.target_volume_name),
             "start_section": start_section,
             "end_section": end_section,
+            "yx_start": warp_config.yx_start,
+            "yx_end": warp_config.yx_size,
             "map_dicts": map_dicts,
             "stride": flow_config.stride,
             "parallelization": warp_config.parallelization,
@@ -603,6 +609,7 @@ def parallel_flow_field_estimation(
         end_section=end_section,
         result_dir=result_dir,
         flow_config=flow_config,
+        integration_config=integration_config,
         warp_config=warp_config,
         context=get_run_context(),
     )
