@@ -18,32 +18,40 @@ from sofima import map_utils, warp
 
 
 @task(cache_key_fn=task_input_hash)
-def create_output_volume(source_volume: Path, target_volume: Path):
-    source_zarr = zarr.group(store=parse_url(source_volume).store)["0"]
+def create_output_volume(source_volume: Path, target_volume: Path, yx_size: list[int]):
+    source_zarr = zarr.group(store=parse_url(source_volume).store)
 
     store = parse_url(path=target_volume, mode="w").store
     target_zarr: zarr.Group = zarr.group(store=store)
 
     target_zarr.create_dataset(
         name="0",
-        shape=source_zarr.shape,
-        chunks=source_zarr.chunks,
-        dtype=source_zarr.dtype,
-        compressor=source_zarr.compressor,
-        fill_value=source_zarr.fill_value,
-        order=source_zarr.order,
+        shape=(source_zarr["0"].shape[0], yx_size[0], yx_size[1]),
+        chunks=source_zarr["0"].chunks,
+        dtype=source_zarr["0"].dtype,
+        compressor=source_zarr["0"].compressor,
+        fill_value=source_zarr["0"].fill_value,
+        order=source_zarr["0"].order,
         overwrite=True,
     )
-    # TODO: write zattrs with spacing information.
+    target_zarr.attrs.update(source_zarr.attrs)
 
     return ZarrSource.from_path(target_volume, group="0", mode="w")
 
 
 @task(cache_key_fn=task_input_hash)
 def copy_first_section(
-    source_volume: ZarrSource, target_volume: ZarrSource, z: int = 0
+    source_volume: ZarrSource,
+    target_volume: ZarrSource,
+    z: int,
+    yx_start: list[int],
+    yx_size: list[int],
 ):
-    target_volume.get_data()[z] = source_volume.get_data()[z]
+    sy = yx_start[0]
+    sx = yx_start[1]
+    ey = sy + yx_size[0]
+    ex = sx + yx_size[1]
+    target_volume.get_data()[z] = source_volume.get_data()[z, sy:ey, sx:ex]
     return ZarrSource.from_path(
         target_volume.get_path(), group="0", slices_start=[z], slices_stop=[z + 1]
     )
@@ -148,7 +156,13 @@ def warp_sections(
     maps = [NumpyTarget(**d) for d in map_dicts]
 
     if start_section == 0:
-        copy_first_section(source_volume, target_volume, z=start_section)
+        copy_first_section(
+            source_volume,
+            target_volume,
+            z=start_section,
+            yx_start=yx_start,
+            yx_size=yx_size,
+        )
         start_section = 1
 
     warped_sections = []
@@ -221,7 +235,7 @@ def warp_volume(
 ):
     src_volume = ZarrSource.from_path(source_volume, group="0")
 
-    warped_zarr = create_output_volume(source_volume, target_volume)
+    warped_zarr = create_output_volume(source_volume, target_volume, yx_size)
 
     n_sections = end_section - start_section
     split = n_sections // parallelization
