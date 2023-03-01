@@ -66,6 +66,7 @@ def warp_section(
     yx_start: list[int],
     yx_size: list[int],
     z: int,
+    z_offset: int,
     map: NumpyTarget,
     stride: float,
 ):
@@ -110,7 +111,7 @@ def warp_section(
             out_end_y = min(end_y, end_y - yx_start[0])
             out_end_x = min(end_x, end_x - yx_start[1])
             out_vol[
-                z, out_start_y:out_end_y, out_start_x:out_end_x
+                z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
             ] = warp.warp_subvolume(
                 src_data,
                 image_box=img_box,
@@ -177,8 +178,9 @@ def warp_sections(
                 target_zarr=target_volume,
                 yx_start=yx_start,
                 yx_size=yx_size,
-                z=z - z_offset,
-                map=maps[i],
+                z=z,
+                z_offset=z_offset,
+                map=maps,
                 stride=stride,
             )
         )
