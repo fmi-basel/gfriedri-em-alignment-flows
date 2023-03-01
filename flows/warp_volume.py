@@ -130,8 +130,8 @@ def warp_section(
     result = ZarrSource.from_path(
         path=target_zarr.get_path(),
         group=target_zarr._group,
-        slices_start=[z],
-        slices_stop=[z + 1],
+        slices_start=[z - z_offset],
+        slices_stop=[z - z_offset + 1],
     )
 
     return result
@@ -180,7 +180,7 @@ def warp_sections(
                 yx_size=yx_size,
                 z=z,
                 z_offset=z_offset,
-                map=maps,
+                map=maps[i],
                 stride=stride,
             )
         )
