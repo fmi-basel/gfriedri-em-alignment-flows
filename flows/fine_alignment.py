@@ -57,6 +57,8 @@ class FlowComputationConfig(BaseModel):
 
 class WarpConfig(BaseModel):
     target_volume_name: str = "warped_zyx.zarr"
+    start_section: int = 0
+    end_section: int = 199
     yx_start: list[int] = list([1000, 2000])
     yx_size: list[int] = list([1000, 1000])
     parallelization: int = 16
@@ -494,6 +496,27 @@ def write_alignment_info(
         f.write(content)
 
 
+@task(cache_key_fn=task_input_hash)
+def start_mesh_optimization(parameters, client):
+    run: FlowRun = run_deployment(
+        name="Optimize mesh/default",
+        parameters=parameters,
+        client=client,
+    )
+    return run.state.result()
+
+
+@task(cache_key_fn=task_input_hash)
+def start_warping(parameters, client):
+    run: FlowRun = run_deployment(
+        name="Warp volume/default",
+        parameters=parameters,
+        client=client,
+    )
+
+    return run.state.result()
+
+
 @flow(
     name="Volume fine-alignment",
     persist_result=True,
@@ -576,31 +599,26 @@ def parallel_flow_field_estimation(
         "integration_config": integration_config,
     }
 
-    run: FlowRun = run_deployment(
-        name="Optimize mesh/default",
-        parameters=opt_mesh_parameters,
+    maps = start_mesh_optimization(parameters=opt_mesh_parameters, client=get_client())
+
+    map_dicts = [m.serialize() for m in maps]
+
+    warp_parameters = {
+        "source_volume": coarse_volume_path,
+        "target_volume": join(result_dir, warp_config.target_volume_name),
+        "start_section": warp_config.start_section,
+        "end_section": warp_config.end_section,
+        "yx_start": warp_config.yx_start,
+        "yx_size": warp_config.yx_size,
+        "map_dicts": map_dicts,
+        "stride": flow_config.stride,
+        "parallelization": warp_config.parallelization,
+    }
+
+    warped_sections = start_warping(
+        parameters=warp_parameters,
         client=get_client(),
     )
-
-    map_dicts = [m.serialize() for m in run.state.result()]
-
-    run: FlowRun = run_deployment(
-        name="Warp volume/default",
-        parameters={
-            "source_volume": coarse_volume_path,
-            "target_volume": join(result_dir, warp_config.target_volume_name),
-            "start_section": start_section,
-            "end_section": end_section,
-            "yx_start": warp_config.yx_start,
-            "yx_size": warp_config.yx_size,
-            "map_dicts": map_dicts,
-            "stride": flow_config.stride,
-            "parallelization": warp_config.parallelization,
-        },
-        client=get_client(),
-    )
-
-    warped_sections = run.state.result()
 
     write_alignment_info(
         path=join(result_dir, warp_config.target_volume_name, "summary.md"),

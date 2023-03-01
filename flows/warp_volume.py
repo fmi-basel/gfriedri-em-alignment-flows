@@ -18,7 +18,9 @@ from sofima import map_utils, warp
 
 
 @task(cache_key_fn=task_input_hash)
-def create_output_volume(source_volume: Path, target_volume: Path, yx_size: list[int]):
+def create_output_volume(
+    source_volume: Path, target_volume: Path, z_size: int, yx_size: list[int]
+):
     source_zarr = zarr.group(store=parse_url(source_volume).store)
 
     store = parse_url(path=target_volume, mode="w").store
@@ -26,7 +28,7 @@ def create_output_volume(source_volume: Path, target_volume: Path, yx_size: list
 
     target_zarr.create_dataset(
         name="0",
-        shape=(source_zarr["0"].shape[0], yx_size[0], yx_size[1]),
+        shape=(z_size, yx_size[0], yx_size[1]),
         chunks=source_zarr["0"].chunks,
         dtype=source_zarr["0"].dtype,
         compressor=source_zarr["0"].compressor,
@@ -235,7 +237,12 @@ def warp_volume(
 ):
     src_volume = ZarrSource.from_path(source_volume, group="0")
 
-    warped_zarr = create_output_volume(source_volume, target_volume, yx_size)
+    warped_zarr = create_output_volume(
+        source_volume,
+        target_volume,
+        z_size=end_section - start_section + 1,
+        yx_size=yx_size,
+    )
 
     n_sections = end_section - start_section
     split = n_sections // parallelization
