@@ -282,6 +282,7 @@ def warp_volume(
             target_volume_dict=warped_zarr.serialize(),
             start_section=start,
             end_section=end_section + 1,
+            z_offset=z_offset,
             yx_start=yx_start,
             yx_size=yx_size,
             map_dicts=map_dicts[start - 1 :],
