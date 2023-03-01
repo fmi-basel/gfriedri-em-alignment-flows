@@ -497,21 +497,21 @@ def write_alignment_info(
 
 
 @task(cache_key_fn=task_input_hash)
-def start_mesh_optimization(parameters, client):
+def start_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
         name="Optimize mesh/default",
         parameters=parameters,
-        client=client,
+        client=get_client(),
     )
     return run.state.result()
 
 
 @task(cache_key_fn=task_input_hash)
-def start_warping(parameters, client):
+def start_warping(parameters):
     run: FlowRun = run_deployment(
         name="Warp volume/default",
         parameters=parameters,
-        client=client,
+        client=get_client(),
     )
 
     return run.state.result()
@@ -599,7 +599,7 @@ def parallel_flow_field_estimation(
         "integration_config": integration_config,
     }
 
-    maps = start_mesh_optimization(parameters=opt_mesh_parameters, client=get_client())
+    maps = start_mesh_optimization(parameters=opt_mesh_parameters)
 
     map_dicts = [m.serialize() for m in maps]
 
@@ -617,7 +617,6 @@ def parallel_flow_field_estimation(
 
     warped_sections = start_warping(
         parameters=warp_parameters,
-        client=get_client(),
     )
 
     write_alignment_info(
