@@ -148,6 +148,7 @@ def warp_sections(
     target_volume_dict: dict,
     start_section: int,
     end_section: int,
+    z_offset: int,
     yx_start: list[int],
     yx_size: list[int],
     map_dicts: List[dict],
@@ -158,6 +159,7 @@ def warp_sections(
     maps = [NumpyTarget(**d) for d in map_dicts]
 
     if start_section == 0:
+        assert z_offset == 0
         copy_first_section(
             source_volume,
             target_volume,
@@ -165,7 +167,7 @@ def warp_sections(
             yx_start=yx_start,
             yx_size=yx_size,
         )
-        start_section = 1
+        start_section += 1
 
     warped_sections = []
     for i, z in enumerate(range(start_section, end_section)):
@@ -175,7 +177,7 @@ def warp_sections(
                 target_zarr=target_volume,
                 yx_start=yx_start,
                 yx_size=yx_size,
-                z=z,
+                z=z - z_offset,
                 map=maps[i],
                 stride=stride,
             )
@@ -190,6 +192,7 @@ def submit_flows(
     target_volume_dict: dict,
     start_section: int,
     end_section: int,
+    z_offset: int,
     yx_start: list[int],
     yx_size: list[int],
     map_dicts: List[dict],
@@ -205,6 +208,7 @@ def submit_flows(
                 "target_volume_dict": target_volume_dict,
                 "start_section": z,
                 "end_section": min(z + n_sections_per_job, end_section),
+                "z_offset": z_offset,
                 "yx_start": yx_start,
                 "yx_size": yx_size,
                 "map_dicts": map_dicts,
@@ -247,11 +251,12 @@ def warp_volume(
     n_sections = end_section - start_section
     split = n_sections // parallelization
     start = start_section
+    z_offset = start
 
     runs = []
     for i in range(parallelization - 1):
         if start == 0:
-            # The is no flow for the first (zeroth) section
+            # There is no flow for the first (zeroth) section
             maps = map_dicts[: start + split - 1]
         else:
             maps = map_dicts[start - 1 : start + split - 1]
@@ -262,6 +267,7 @@ def warp_volume(
                 target_volume_dict=warped_zarr.serialize(),
                 start_section=start,
                 end_section=start + split,
+                z_offset=z_offset,
                 yx_start=yx_start,
                 yx_size=yx_size,
                 map_dicts=maps,
