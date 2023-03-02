@@ -202,7 +202,19 @@ def submit_flows(
 ):
     n_sections_per_job = 25
     warped_sections = []
-    for z in range(start_section, end_section, n_sections_per_job):
+    for i, z in enumerate(range(start_section, end_section, n_sections_per_job)):
+        if start_section == 0:
+            # Special case:
+            # There is no flow for the zeroth section
+            if z == 0:
+                maps = map_dicts[: (i + 1) * n_sections_per_job - 1]
+            else:
+                start = i * n_sections_per_job - 1
+                maps = map_dicts[start : start + n_sections_per_job]
+        else:
+            start = i * n_sections_per_job
+            maps = map_dicts[start : start + n_sections_per_job]
+
         run: FlowRun = run_deployment(
             name="Warp sections/default",
             parameters={
@@ -213,7 +225,7 @@ def submit_flows(
                 "z_offset": z_offset,
                 "yx_start": yx_start,
                 "yx_size": yx_size,
-                "map_dicts": map_dicts,
+                "map_dicts": maps,
                 "stride": stride,
             },
             client=get_client(),
