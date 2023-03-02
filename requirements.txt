@@ -2,4 +2,5 @@ em_alignment @ https://github.com/fmi-basel/gfriedri-em-alignment.git@v0.2.0
 prefect
 prefect-dask
 dask-jobqueue
-cpr @ https://github.com/fmi-faim/custom-prefect-result.git@v0.1.3
+cpr @ https://github.com/fmi-faim/custom-prefect-result.git@v0.1.4
+sofima @ https://github.com/google-research/sofima@64a07f9477f522251e7bb44481063329dac2bb24
