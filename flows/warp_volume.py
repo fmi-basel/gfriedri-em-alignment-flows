@@ -86,10 +86,10 @@ def warp_section(
             src_start_y = max(0, y - 500)
             src_start_x = max(0, x - 500)
             src_end_y = min(
-                min(y + tile_size + 500, y + yx_size[0] + 500), section_data.shape[1]
+                min(y + tile_size + 500, y + yx_size[0] + 500), out_vol.shape[1]
             )
             src_end_x = min(
-                min(x + tile_size + 500, x + yx_size[1] + 500), section_data.shape[2]
+                min(x + tile_size + 500, x + yx_size[1] + 500), out_vol.shape[2]
             )
             src_data = section_data[
                 z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
@@ -100,8 +100,8 @@ def warp_section(
                 size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
             )
 
-            end_y = min(min(y + tile_size, y + yx_size[0]), section_data.shape[1])
-            end_x = min(min(x + tile_size, x + yx_size[1]), section_data.shape[2])
+            end_y = min(min(y + tile_size, y + yx_size[0]), out_vol.shape[1])
+            end_x = min(min(x + tile_size, x + yx_size[1]), out_vol.shape[2])
             out_box = bounding_box.BoundingBox(
                 start=(x, y, 0), size=(end_x - x, end_y - y, 1)
             )
