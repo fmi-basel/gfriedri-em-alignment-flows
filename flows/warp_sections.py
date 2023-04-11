@@ -145,6 +145,7 @@ def warp_and_save(
     margin: int,
     use_clahe: bool,
     clahe_kwargs: Dict,
+    warp_parallelism: int,
 ):
     logger = get_run_logger()
     path = section_dict.pop("path")
@@ -169,7 +170,7 @@ def warp_and_save(
             section_dir=join(path, section.get_name()),
             stride=stride,
             margin=margin,
-            parallelism=48,
+            parallelism=warp_parallelism,
             use_clahe=use_clahe,
             clahe_kwargs=clahe_kwargs,
         )
@@ -204,7 +205,7 @@ def warp_and_save(
                 volume.write_section(
                     section_num=section.get_section_num(),
                     data=warped_tiles[np.newaxis],
-                    offsets=offset,
+                    offsets=tuple([z_index, 0, 0]),
                 )
 
             logger.info(
@@ -319,6 +320,7 @@ def warp_sections_flow(
                     "clip_limit": warp_config.clip_limit,
                     "nbins": warp_config.nbins,
                 },
+                warp_parallelism=warp_config.warp_parallelism,
             ).result()
         except prefect.exceptions.CrashedRun:
             # Re-submit if slurm node changes.

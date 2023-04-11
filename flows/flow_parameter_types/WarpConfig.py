@@ -8,3 +8,4 @@ class WarpConfig(BaseModel):
     kernel_size: int = 1024
     clip_limit: float = 0.01
     nbins: int = 256
+    warp_parallelism: int = 48
