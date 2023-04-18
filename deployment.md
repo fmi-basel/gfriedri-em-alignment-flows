@@ -16,7 +16,7 @@ prefect deployment build flows/fine_alignment.py:flow_field_estimation -n "defau
 
 prefect deployment build flows/fine_alignment.py:parallel_flow_field_estimation -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/fine_alignment_pffe.yaml -ib process/slurm-gfriedri-em-alignment-flows
 
-prefect deployment build flows/fine_alignment.py:optimize_mesh -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/optimize_mesh.yaml -ib process/gfriedri-estimate-flow-field-3d
+prefect deployment build flows/fine_alignment.py:optimize_block_mesh -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/optimize_mesh.yaml -ib process/gfriedri-estimate-flow-field-3d
 
 prefect deployment build flows/warp_volume.py:warp_volume -n "default" -q slurm -sb github/gfriedri-em-alignment-flows --skip-upload -o deployment/warp_volume.yaml -ib process/slurm-gfriedri-em-alignment-flows
 

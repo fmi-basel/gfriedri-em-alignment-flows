@@ -41,6 +41,7 @@ class MeshIntegrationConfig(BaseModel):
     start_cap: float = 0.01
     final_cap: float = 10
     prefer_orig_order: bool = True
+    block_size: int = 500
 
 
 class FlowComputationConfig(BaseModel):
@@ -325,7 +326,7 @@ def compute_final_flow(
 
 
 @task(cache_key_fn=task_input_hash)
-def run_mesh_optimization(
+def run_block_mesh_optimization(
     final_flows: list[NumpyTarget],
     out_dir: str,
     stride: int,
@@ -370,13 +371,13 @@ def run_mesh_optimization(
 
 
 @flow(
-    name="Optimize mesh",
+    name="Optimize block mesh",
     persist_result=True,
     result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
 )
-def optimize_mesh(
+def optimize_block_mesh(
     final_flow_dicts: List[dict],
     out_dir: str,
     stride: int,
@@ -384,7 +385,7 @@ def optimize_mesh(
 ):
     final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
 
-    maps = run_mesh_optimization(
+    maps = run_block_mesh_optimization(
         final_flows=final_flows,
         out_dir=out_dir,
         stride=stride,
@@ -497,9 +498,9 @@ def write_alignment_info(
 
 
 @task(cache_key_fn=task_input_hash)
-def start_mesh_optimization(parameters):
+def start_block_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
-        name="Optimize mesh/default",
+        name="Optimize block mesh/default",
         parameters=parameters,
         client=get_client(),
     )
@@ -589,36 +590,56 @@ def parallel_flow_field_estimation(
     for final_flow in final_flows:
         serialized_final_flows.append(final_flow.serialize())
 
-    map_dir = join(result_dir, "maps")
-    os.makedirs(map_dir, exist_ok=True)
+    logger = get_run_logger()
+    logger.info(len(final_flows))
+    logger.info(integration_config.block_size)
 
-    opt_mesh_parameters = {
-        "final_flow_dicts": serialized_final_flows,
-        "out_dir": map_dir,
-        "stride": flow_config.stride,
-        "integration_config": integration_config,
-    }
+    # Optimize z-alignment in chunks/blocks
+    runs = []
+    blocks = []
+    for i in range(0, len(final_flows), integration_config.block_size):
+        start = i
+        end = min(start + integration_config.block_size, len(final_flows))
+        map_dir = join(result_dir, "maps", f"block_{start}-{end}")
+        blocks.append((start, end))
+        os.makedirs(map_dir, exist_ok=True)
+        opt_mesh_parameters = {
+            "final_flow_dicts": serialized_final_flows[start:end],
+            "out_dir": map_dir,
+            "stride": flow_config.stride,
+            "integration_config": integration_config,
+        }
 
-    maps = start_mesh_optimization(parameters=opt_mesh_parameters)
+        runs.append(
+            start_block_mesh_optimization.submit(parameters=opt_mesh_parameters)
+        )
 
-    map_dicts = [m.serialize() for m in maps]
+    block_maps = []
+    for run in runs:
+        block_maps.extend(run.result())
 
-    warp_parameters = {
-        "source_volume": coarse_volume_path,
-        "target_volume": join(result_dir, warp_config.target_volume_name),
-        "start_section": warp_config.start_section,
-        "end_section": warp_config.end_section,
-        "yx_start": warp_config.yx_start,
-        "yx_size": warp_config.yx_size,
-        "map_dicts": map_dicts,
-        "stride": flow_config.stride,
-        "parallelization": warp_config.parallelization,
-    }
+    # Optimize flow between chunks/blocks
 
-    warped_sections = start_warping(
-        parameters=warp_parameters,
-    )
+    # Reconcile cross block maps
 
+    # map_dicts = [m.serialize() for m in maps]
+    #
+    # warp_parameters = {
+    #     "source_volume": coarse_volume_path,
+    #     "target_volume": join(result_dir, warp_config.target_volume_name),
+    #     "start_section": warp_config.start_section,
+    #     "end_section": warp_config.end_section,
+    #     "yx_start": warp_config.yx_start,
+    #     "yx_size": warp_config.yx_size,
+    #     "map_dicts": map_dicts,
+    #     "stride": flow_config.stride,
+    #     "parallelization": warp_config.parallelization,
+    # }
+    #
+    # warped_sections = start_warping(
+    #     parameters=warp_parameters,
+    # )
+    #
     write_alignment_info(
         path=join(result_dir, warp_config.target_volume_name, "summary.md"),
         coarse_volume_path=coarse_volume_path,
@@ -631,7 +652,7 @@ def parallel_flow_field_estimation(
         context=get_run_context(),
     )
 
-    return warped_sections
+    # return warped_sections
 
 
 if __name__ == "__main__":
