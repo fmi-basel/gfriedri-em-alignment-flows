@@ -336,6 +336,7 @@ def warp_sections_flow(
                     "clip_limit": warp_config.clip_limit,
                     "nbins": warp_config.nbins,
                 },
+                warp_parallelism=warp_config.warp_parallelism,
             ).result()
 
         exp.get_sample(exp_config.sample_name).get_section(
