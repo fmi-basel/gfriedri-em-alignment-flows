@@ -16,6 +16,8 @@ from cpr.numpy.NumpyTarget import NumpyTarget
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
 from cpr.zarr.ZarrSource import ZarrSource
+from faim_prefect.parallelization.utils import wait_for_task_run
+from numpy._typing import ArrayLike
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.context import FlowRunContext, TaskRunContext, get_run_context
@@ -69,6 +71,31 @@ def load_section(path: str, z: int) -> ZarrSource:
     return ZarrSource.from_path(path, group="0", slices_start=[z], slices_stop=[z + 1])
 
 
+def clean_flow(
+    flow,
+    patch_size: int,
+    stride: int,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+):
+    flow = flow[np.newaxis]
+    flow = np.transpose(flow, [1, 0, 2, 3])
+    pad = patch_size // 2 // stride
+    flow = np.pad(
+        flow, [[0, 0], [0, 0], [pad, pad], [pad, pad]], constant_values=np.nan
+    )
+
+    return flow_utils.clean_flow(
+        flow,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
+
+
 def exlude_semaphore_task_input_hash(
     context: "TaskRunContext", arguments: Dict[str, Any]
 ) -> Optional[str]:
@@ -92,6 +119,12 @@ def compute_flow_field(
     patch_size,
     stride,
     batch_size,
+    min_peak_ratio: float,
+    min_peak_sharpness: float,
+    max_magnitude: float,
+    max_deviation: float,
+    max_gradient: float,
+    min_patch_size: int,
     gpu_sem: threading.Semaphore,
 ):
     logger = get_run_logger()
@@ -147,13 +180,40 @@ def compute_flow_field(
     mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
     logger.info(f"[End] Process memory usage: {mem_usage} GB")
 
-    os.makedirs(join(out_dir, str(z)), exist_ok=True)
-    ff1x = NumpyTarget.from_path(join(out_dir, str(z), f"flows1x_{z - 1}_to_{z}.npy"))
-    ff1x.set_data(flows1x)
+    flows1x = clean_flow(
+        flows1x,
+        patch_size=patch_size,
+        stride=stride,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
 
-    ff2x = NumpyTarget.from_path(join(out_dir, str(z), f"flows2x_{z - 1}_to_{z}.npy"))
-    ff2x.set_data(flows2x)
-    return ff1x, ff2x
+    flows2x = clean_flow(
+        flows2x,
+        patch_size=patch_size,
+        stride=stride,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
+
+    final_flow = compute_final_flow(
+        flows1x,
+        flows2x,
+        max_gradient=max_gradient,
+        max_deviation=max_deviation,
+        min_patch_size=min_patch_size,
+    )
+
+    final_flow_output = NumpyTarget.from_path(
+        join(out_dir, f"final_flow_{z - 1}_to_{z}.npy")
+    )
+    final_flow_output.set_data(final_flow)
+
+    return final_flow_output
 
 
 @flow(
@@ -171,11 +231,17 @@ def flow_field_estimation(
     patch_size: int = 160,
     stride: int = 40,
     batch_size: int = 256,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+    max_gradient: float = 0,
+    min_patch_size: int = 400,
 ):
     mfc = flow_field.JAXMaskedXCorrWithStatsCalculator()
     gpu_sem = threading.Semaphore(1)
     sections = []
-    flows1x, flows2x = [], []
+    final_flows = []
 
     prev = load_section(path, start_section)
     for i in range(start_section + 1, end_section + 1):
@@ -197,73 +263,42 @@ def flow_field_estimation(
                 patch_size=patch_size,
                 stride=stride,
                 batch_size=batch_size,
+                min_peak_ratio=min_peak_ratio,
+                min_peak_sharpness=min_peak_sharpness,
+                max_magnitude=max_magnitude,
+                max_deviation=max_deviation,
+                max_gradient=max_gradient,
+                min_patch_size=min_patch_size,
                 gpu_sem=gpu_sem,
             )
         )
         prev = curr
 
-        while len(buffer) >= 4:
-            flow1x, flow2x = buffer[0].result()
-            flows1x.append(flow1x)
-            flows2x.append(flow2x)
-            buffer = buffer[1:]
+        wait_for_task_run(
+            results=final_flows,
+            buffer=buffer,
+            max_buffer_length=4,
+            result_insert_fn=lambda r: r.result(),
+        )
 
     # Wait for all tasks to finish and collect results
-    while len(buffer) > 0:
-        flow1x, flow2x = buffer[0].result()
-        flows1x.append(flow1x)
-        flows2x.append(flow2x)
-        buffer = buffer[1:]
-
-    return flows1x, flows2x
-
-
-@task(cache_key_fn=task_input_hash)
-def load_flows(
-    flow_list: List[NumpyTarget],
-    patch_size: int,
-    stride: int,
-    out_dir: str,
-    min_peak_ratio: float = 1.6,
-    min_peak_sharpness: float = 1.6,
-    max_magnitude: float = 80,
-    max_deviation: float = 20,
-):
-    flows = []
-    for f in flow_list:
-        flows.append(f.get_data())
-
-    flows = np.transpose(np.array(flows), [1, 0, 2, 3])
-    pad = patch_size // 2 // stride
-    flows = np.pad(
-        flows, [[0, 0], [0, 0], [pad, pad], [pad, pad]], constant_values=np.nan
+    wait_for_task_run(
+        results=final_flows,
+        buffer=buffer,
+        max_buffer_length=0,
+        result_insert_fn=lambda r: r.result(),
     )
 
-    flow = flow_utils.clean_flow(
-        flows,
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-
-    os.makedirs(out_dir, exist_ok=True)
-    output = NumpyTarget.from_path(join(out_dir, "clean_flows.npy"))
-    output.set_data(flow)
-    return output
+    return final_flows
 
 
-@task(cache_key_fn=task_input_hash)
 def compute_final_flow(
-    flow1x: NumpyTarget,
-    flow2x: NumpyTarget,
+    f1: ArrayLike,
+    f2: ArrayLike,
     max_gradient: float,
     max_deviation: float,
     min_patch_size: int,
-    out_dir: str,
 ):
-    f1 = flow1x.get_data()
-    f2 = flow2x.get_data()
     f2_hires = np.zeros_like(f1)
 
     scale = 0.5
@@ -281,22 +316,17 @@ def compute_final_flow(
         )
         f2_hires[:, z : z + 1, ...] = resampled / scale
 
-    final_flow = flow_utils.reconcile_flows(
+    return flow_utils.reconcile_flows(
         (f1, f2_hires),
         max_gradient=max_gradient,
         max_deviation=max_deviation,
         min_patch_size=min_patch_size,
     )
 
-    os.makedirs(out_dir, exist_ok=True)
-    output = NumpyTarget.from_path(join(out_dir, "final_flow.npy"))
-    output.set_data(final_flow)
-    return output
-
 
 @task(cache_key_fn=task_input_hash)
 def run_mesh_optimization(
-    flow: NumpyTarget,
+    final_flows: list[NumpyTarget],
     out_dir: str,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
@@ -315,8 +345,7 @@ def run_mesh_optimization(
         final_cap=integration_config.final_cap,
         prefer_orig_order=integration_config.prefer_orig_order,
     )
-
-    final_flow = flow.get_data()
+    final_flow = np.concatenate([ff.get_data() for ff in final_flows], axis=1)
     solved = [np.zeros_like(final_flow[:, 0:1, ...])]
     origin = jnp.array([0.0, 0.0])
 
@@ -348,54 +377,15 @@ def run_mesh_optimization(
     cache_result_in_memory=False,
 )
 def optimize_mesh(
-    flows_1x_dicts: List[dict],
-    flows_2x_dicts: List[dict],
+    final_flow_dicts: List[dict],
     out_dir: str,
-    patch_size: int,
     stride: int,
-    min_peak_ratio: float,
-    min_peak_sharpness: float,
-    max_magnitude: float,
-    max_deviation: float,
-    max_gradient: float,
-    min_patch_size: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
-    flows_1x = [NumpyTarget(**d) for d in flows_1x_dicts]
-    flows_2x = [NumpyTarget(**d) for d in flows_2x_dicts]
-
-    flows1x = load_flows.submit(
-        flows_1x,
-        patch_size=patch_size,
-        stride=stride,
-        out_dir=join(out_dir, "clean_flow1x"),
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-    flows2x = load_flows.submit(
-        flows_2x,
-        patch_size=patch_size,
-        stride=stride,
-        out_dir=join(out_dir, "clean_flow2x"),
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-
-    final_flow = compute_final_flow(
-        flows1x,
-        flows2x,
-        max_gradient=max_gradient,
-        max_deviation=max_deviation,
-        min_patch_size=min_patch_size,
-        out_dir=out_dir,
-    )
+    final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
 
     maps = run_mesh_optimization(
-        flow=final_flow,
+        final_flows=final_flows,
         out_dir=out_dir,
         stride=stride,
         integration_config=integration_config,
@@ -414,8 +404,14 @@ def submit_flows(
     patch_size: int,
     stride: int,
     batch_size: int,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+    max_gradient: float = 0,
+    min_patch_size: int = 400,
 ):
-    flows1x, flows2x = [], []
+    final_flows = []
     for z in range(start_section, end_section, chunk_size):
         run: FlowRun = run_deployment(
             name="Estimate flow-field/default",
@@ -427,15 +423,19 @@ def submit_flows(
                 "patch_size": patch_size,
                 "stride": stride,
                 "batch_size": batch_size,
+                "min_peak_ratio": min_peak_ratio,
+                "min_peak_sharpness": min_peak_sharpness,
+                "max_magnitude": max_magnitude,
+                "max_deviation": max_deviation,
+                "max_gradient": max_gradient,
+                "min_patch_size": min_patch_size,
             },
             client=get_client(),
         )
 
-        f1x, f2x = run.state.result()
-        flows1x.extend(f1x)
-        flows2x.extend(f2x)
+        final_flows.extend(run.state.result())
 
-    return flows1x, flows2x
+    return final_flows
 
 
 def write_alignment_info(
@@ -552,6 +552,12 @@ def parallel_flow_field_estimation(
                 patch_size=flow_config.patch_size,
                 stride=flow_config.stride,
                 batch_size=flow_config.batch_size,
+                min_peak_ratio=flow_config.min_peak_ratio,
+                min_peak_sharpness=flow_config.min_peak_sharpness,
+                max_magnitude=flow_config.max_magnitude,
+                max_deviation=flow_config.max_deviation,
+                max_gradient=flow_config.max_gradient,
+                min_patch_size=flow_config.min_patch_size,
             )
         )
         start = start + split
@@ -566,36 +572,30 @@ def parallel_flow_field_estimation(
             patch_size=flow_config.patch_size,
             stride=flow_config.stride,
             batch_size=flow_config.batch_size,
+            min_peak_ratio=flow_config.min_peak_ratio,
+            min_peak_sharpness=flow_config.min_peak_sharpness,
+            max_magnitude=flow_config.max_magnitude,
+            max_deviation=flow_config.max_deviation,
+            max_gradient=flow_config.max_gradient,
+            min_patch_size=flow_config.min_patch_size,
         )
     )
 
-    flows1x, flows2x = [], []
+    final_flows = []
     for run in runs:
-        f1x, f2x = run.result()
-        flows1x.extend(f1x)
-        flows2x.extend(f2x)
+        final_flows.extend(run.result())
 
-    serialized_f1x = []
-    serialized_f2x = []
-    for f1, f2 in zip(flows1x, flows2x):
-        serialized_f1x.append(f1.serialize())
-        serialized_f2x.append(f2.serialize())
+    serialized_final_flows = []
+    for final_flow in final_flows:
+        serialized_final_flows.append(final_flow.serialize())
 
     map_dir = join(result_dir, "maps")
     os.makedirs(map_dir, exist_ok=True)
 
     opt_mesh_parameters = {
-        "flows_1x_dicts": serialized_f1x,
-        "flows_2x_dicts": serialized_f2x,
+        "final_flow_dicts": serialized_final_flows,
         "out_dir": map_dir,
-        "patch_size": flow_config.patch_size,
         "stride": flow_config.stride,
-        "min_peak_ratio": flow_config.min_peak_ratio,
-        "min_peak_sharpness": flow_config.min_peak_sharpness,
-        "max_magnitude": flow_config.max_magnitude,
-        "max_deviation": flow_config.max_deviation,
-        "max_gradient": flow_config.max_gradient,
-        "min_patch_size": flow_config.min_patch_size,
         "integration_config": integration_config,
     }
 
