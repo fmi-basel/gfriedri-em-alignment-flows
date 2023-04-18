@@ -1,0 +1,16 @@
+name: gfriedri-em-alignment-flows
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - jaxlib=*=*cuda*
+  - jax
+  - nvidia::cuda-nvcc
+  - pip
+  - pip:
+     - psutil
+     - git+https://github.com/fmi-basel/gfriedri-em-alignment@main
+     - prefect==2.9.*
+     - git+https://github.com/fmi-faim/custom-prefect-result@v0.1.7
+     - git+https://github.com/fmi-faim/faim-prefect@v0.2.2
