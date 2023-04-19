@@ -11,13 +11,16 @@ import jax.numpy as jnp
 import numpy as np
 import pkg_resources
 import psutil
+import zarr
 from connectomics.common import bounding_box
 from cpr.numpy.NumpyTarget import NumpyTarget
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
 from cpr.zarr.ZarrSource import ZarrSource
 from faim_prefect.parallelization.utils import wait_for_task_run
+from numcodecs import Blosc
 from numpy._typing import ArrayLike
+from ome_zarr.io import parse_url
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.context import FlowRunContext, TaskRunContext, get_run_context
@@ -328,7 +331,8 @@ def compute_final_flow(
 @task(cache_key_fn=task_input_hash)
 def run_block_mesh_optimization(
     final_flows: list[NumpyTarget],
-    out_dir: str,
+    start_section: int,
+    map_zarr: ZarrSource,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
@@ -347,27 +351,32 @@ def run_block_mesh_optimization(
         prefer_orig_order=integration_config.prefer_orig_order,
     )
     final_flow = np.concatenate([ff.get_data() for ff in final_flows], axis=1)
-    solved = [np.zeros_like(final_flow[:, 0:1, ...])]
     origin = jnp.array([0.0, 0.0])
 
+    solved = map_zarr.get_data()
     for z in tqdm(range(0, final_flow.shape[1])):
         prev = map_utils.compose_maps_fast(
-            final_flow[:, z : z + 1, ...], origin, stride, solved[-1], origin, stride
+            final_flow[:, z : z + 1, ...],
+            origin,
+            stride,
+            solved[:, start_section + z : start_section + z + 1],
+            origin,
+            stride,
         )
         x = np.zeros_like(solved[0])
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
-        solved.append(x)
+        solved[:, start_section + z + 1 : start_section + z + 2] = x
 
-    solved = np.concatenate(solved, axis=1)
+    output_zarr_src = ZarrSource.from_path(
+        path=map_zarr.get_path(),
+        group=map_zarr._group,
+        slices_start=[0, start_section],
+        slices_stop=[None, start_section + solved.shape[1]],
+        mode="r",
+    )
 
-    outputs = []
-    for z in range(1, solved.shape[1]):
-        out = NumpyTarget.from_path(join(out_dir, f"map_{z}.npy"))
-        out.set_data(solved[:, z : z + 1])
-        outputs.append(out)
-
-    return outputs
+    return output_zarr_src
 
 
 @flow(
@@ -379,15 +388,18 @@ def run_block_mesh_optimization(
 )
 def optimize_block_mesh(
     final_flow_dicts: List[dict],
-    out_dir: str,
+    start_section: int,
+    map_zarr_dict: dict,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
     final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
+    map_zarr = ZarrSource(**map_zarr_dict)
 
     maps = run_block_mesh_optimization(
         final_flows=final_flows,
-        out_dir=out_dir,
+        start_section=start_section,
+        map_zarr=map_zarr,
         stride=stride,
         integration_config=integration_config,
     )
@@ -590,22 +602,33 @@ def parallel_flow_field_estimation(
     for final_flow in final_flows:
         serialized_final_flows.append(final_flow.serialize())
 
-    logger = get_run_logger()
-    logger.info(len(final_flows))
-    logger.info(integration_config.block_size)
-
     # Optimize z-alignment in chunks/blocks
+    store = parse_url(path=join(result_dir, "maps.zarr"), mode="w").store
+    map_zarr: zarr.Group = zarr.group(store=store)
+
+    shape = final_flows[0].get_data().shape[2:]
+    map_zarr.create_dataset(
+        name="main",
+        shape=(2, len(final_flows), *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    main_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="main", mode="w"
+    )
     runs = []
     blocks = []
     for i in range(0, len(final_flows), integration_config.block_size):
         start = i
         end = min(start + integration_config.block_size, len(final_flows))
-        map_dir = join(result_dir, "maps", f"block_{start}-{end}")
         blocks.append((start, end))
-        os.makedirs(map_dir, exist_ok=True)
         opt_mesh_parameters = {
             "final_flow_dicts": serialized_final_flows[start:end],
-            "out_dir": map_dir,
+            "start_section": start,
+            "map_zarr_dict": main_map_zarr.serialize(),
             "stride": flow_config.stride,
             "integration_config": integration_config,
         }
