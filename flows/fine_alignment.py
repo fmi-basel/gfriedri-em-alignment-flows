@@ -332,7 +332,8 @@ def compute_final_flow(
 def run_block_mesh_optimization(
     final_flows: list[NumpyTarget],
     start_section: int,
-    map_zarr: ZarrSource,
+    main_map_zarr: ZarrSource,
+    main_inv_map_zarr: ZarrSource,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
@@ -353,7 +354,8 @@ def run_block_mesh_optimization(
     final_flow = np.concatenate([ff.get_data() for ff in final_flows], axis=1)
     origin = jnp.array([0.0, 0.0])
 
-    solved = map_zarr.get_data()
+    solved = main_map_zarr.get_data()
+    inv_map = main_inv_map_zarr.get_data()
     for z in tqdm(range(0, final_flow.shape[1])):
         prev = map_utils.compose_maps_fast(
             final_flow[:, z : z + 1, ...],
@@ -367,16 +369,12 @@ def run_block_mesh_optimization(
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         solved[:, start_section + z + 1 : start_section + z + 2] = x
+        map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
+        inv_map[
+            :, start_section + z + 1 : start_section + z + 2
+        ] = map_utils.invert_map(x, map_box, map_box, stride)
 
-    output_zarr_src = ZarrSource.from_path(
-        path=map_zarr.get_path(),
-        group=map_zarr._group,
-        slices_start=[0, start_section],
-        slices_stop=[None, start_section + solved.shape[1]],
-        mode="r",
-    )
-
-    return output_zarr_src
+    return main_map_zarr, main_inv_map_zarr
 
 
 @flow(
@@ -389,17 +387,20 @@ def run_block_mesh_optimization(
 def optimize_block_mesh(
     final_flow_dicts: List[dict],
     start_section: int,
-    map_zarr_dict: dict,
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
     final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
-    map_zarr = ZarrSource(**map_zarr_dict)
+    main_map_zarr = ZarrSource(**main_map_zarr_dict)
+    main_inv_map_zarr = ZarrSource(**main_inv_map_zarr_dict)
 
     maps = run_block_mesh_optimization(
         final_flows=final_flows,
         start_section=start_section,
-        map_zarr=map_zarr,
+        main_map_zarr=main_map_zarr,
+        main_inv_map_zarr=main_inv_map_zarr,
         stride=stride,
         integration_config=integration_config,
     )
@@ -616,8 +617,20 @@ def parallel_flow_field_estimation(
         fill_value=0,
         overwrite=True,
     )
+    map_zarr.create_dataset(
+        name="main_inv",
+        shape=(2, len(final_flows) + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
     main_map_zarr = ZarrSource.from_path(
         join(result_dir, "maps.zarr"), group="main", mode="w"
+    )
+    main_map_inv_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="main_inv", mode="w"
     )
     runs = []
     blocks = []
@@ -628,7 +641,8 @@ def parallel_flow_field_estimation(
         opt_mesh_parameters = {
             "final_flow_dicts": serialized_final_flows[start:end],
             "start_section": start,
-            "map_zarr_dict": main_map_zarr.serialize(),
+            "main_map_zarr_dict": main_map_zarr.serialize(),
+            "main_inv_map_zarr_dict": main_map_inv_zarr.serialize(),
             "stride": flow_config.stride,
             "integration_config": integration_config,
         }
