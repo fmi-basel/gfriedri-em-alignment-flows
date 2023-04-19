@@ -359,11 +359,11 @@ def run_block_mesh_optimization(
             final_flow[:, z : z + 1, ...],
             origin,
             stride,
-            solved[:, start_section + z : start_section + z + 1],
+            solved[:, start_section + z : start_section + z + 1, ...],
             origin,
             stride,
         )
-        x = np.zeros_like(solved[0])
+        x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         solved[:, start_section + z + 1 : start_section + z + 2] = x
@@ -609,7 +609,7 @@ def parallel_flow_field_estimation(
     shape = final_flows[0].get_data().shape[2:]
     map_zarr.create_dataset(
         name="main",
-        shape=(2, len(final_flows), *shape),
+        shape=(2, len(final_flows) + 1, *shape),
         chunks=(2, 1, *shape),
         dtype="<f4",
         compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
