@@ -10,6 +10,8 @@ dependencies:
   - pip
   - pip:
      - psutil
+     - tensorflow
+     - tensorstore
      - git+https://github.com/fmi-basel/gfriedri-em-alignment@main
      - prefect==2.9.*
      - git+https://github.com/fmi-faim/custom-prefect-result@v0.1.7
