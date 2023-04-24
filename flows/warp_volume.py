@@ -1,23 +1,27 @@
 import gc
 from pathlib import Path
-from typing import List
 
 import numpy as np
 import zarr
 from connectomics.common import bounding_box
-from cpr.numpy.NumpyTarget import NumpyTarget
+from connectomics.volume import subvolume
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
 from cpr.zarr.ZarrSource import ZarrSource
+from faim_prefect.parallelization.utils import wait_for_task_run
+from numpy._typing import ArrayLike
 from ome_zarr.io import parse_url
-from prefect import flow, get_client, task
+from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
 from sofima import map_utils, warp
+from sofima.processor import maps
+
+from flows.utils.storage_key import RESULT_STORAGE_KEY
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def create_output_volume(
     source_volume: Path, target_volume: Path, z_size: int, yx_size: list[int]
 ):
@@ -41,25 +45,7 @@ def create_output_volume(
     return ZarrSource.from_path(target_volume, group="0", mode="w")
 
 
-@task(cache_key_fn=task_input_hash)
-def copy_first_section(
-    source_volume: ZarrSource,
-    target_volume: ZarrSource,
-    z: int,
-    yx_start: list[int],
-    yx_size: list[int],
-):
-    sy = yx_start[0]
-    sx = yx_start[1]
-    ey = sy + yx_size[0]
-    ex = sx + yx_size[1]
-    target_volume.get_data()[z] = source_volume.get_data()[z, sy:ey, sx:ex]
-    return ZarrSource.from_path(
-        target_volume.get_path(), group="0", slices_start=[z], slices_stop=[z + 1]
-    )
-
-
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def warp_section(
     source_volume: ZarrSource,
     target_zarr: ZarrSource,
@@ -67,14 +53,13 @@ def warp_section(
     yx_size: list[int],
     z: int,
     z_offset: int,
-    map: NumpyTarget,
+    map_data: ArrayLike,
     stride: float,
 ):
-    map_data = map.get_data()
     box = bounding_box.BoundingBox(
         start=(0, 0, 0), size=(map_data.shape[-1], map_data.shape[-2], 1)
     )
-    inv_map = map_utils.invert_map(map.get_data(), box, box, stride)
+    inv_map = map_utils.invert_map(map_data, box, box, stride)
 
     section_data = source_volume.get_data()
 
@@ -86,10 +71,12 @@ def warp_section(
             src_start_y = max(0, y - 500)
             src_start_x = max(0, x - 500)
             src_end_y = min(
-                min(y + tile_size + 500, y + yx_size[0] + 500), out_vol.shape[1]
+                min(y + tile_size + 500, y + yx_size[0] + 500),
+                yx_start[0] + out_vol.shape[1],
             )
             src_end_x = min(
-                min(x + tile_size + 500, x + yx_size[1] + 500), out_vol.shape[2]
+                min(x + tile_size + 500, x + yx_size[1] + 500),
+                yx_start[1] + out_vol.shape[2],
             )
             src_data = section_data[
                 z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
@@ -100,8 +87,12 @@ def warp_section(
                 size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
             )
 
-            end_y = min(min(y + tile_size, y + yx_size[0]), out_vol.shape[1])
-            end_x = min(min(x + tile_size, x + yx_size[1]), out_vol.shape[2])
+            end_y = min(
+                min(y + tile_size, y + yx_size[0]), yx_start[0] + out_vol.shape[1]
+            )
+            end_x = min(
+                min(x + tile_size, x + yx_size[1]), yx_start[1] + out_vol.shape[2]
+            )
             out_box = bounding_box.BoundingBox(
                 start=(x, y, 0), size=(end_x - x, end_y - y, 1)
             )
@@ -110,6 +101,12 @@ def warp_section(
             out_start_x = min(x, x - yx_start[1])
             out_end_y = min(end_y, end_y - yx_start[0])
             out_end_x = min(end_x, end_x - yx_start[1])
+            logger = get_run_logger()
+            logger.debug(f"y = {y}, x = {x}")
+            logger.debug(f"img_box = {img_box}")
+            logger.debug(f"out_box = {out_box}")
+            logger.debug(f"out_start_y = {out_start_y}, out_end_y = {out_end_y}")
+            logger.debug(f"out_start_x = {out_start_x}, out_end_x = {out_end_x}")
             out_vol[
                 z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
             ] = warp.warp_subvolume(
@@ -137,6 +134,53 @@ def warp_section(
     return result
 
 
+def reconcile_flow(
+    blocks: list[tuple[int, int]],
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    last_inv_map_zarr_dict: dict,
+    stride: int,
+    start_section: int,
+    end_section: int,
+):
+    main_map = ZarrSource(**main_map_zarr_dict).get_data()
+    main_inv_map = ZarrSource(**main_inv_map_zarr_dict).get_data()
+    cross_block_map = ZarrSource(**cross_block_map_zarr_dict).get_data()
+    cross_block_inv_map = ZarrSource(**cross_block_inv_map_zarr_dict).get_data()
+    last_inv_map = ZarrSource(**last_inv_map_zarr_dict).get_data()
+
+    class ReconcileCrossBlockMaps(maps.ReconcileCrossBlockMaps):
+        def _open_volume(self, path: str):
+            if path == "main_inv":
+                return main_inv_map
+            elif path == "last_inv":
+                return last_inv_map
+            elif path == "xblk":
+                return cross_block_map
+            elif path == "xblk_inv":
+                return cross_block_inv_map
+            else:
+                raise ValueError(f"Unknown volume {path}")
+
+    reconcile = ReconcileCrossBlockMaps(
+        "xblk",
+        "xblk_inv",
+        "last_inv",
+        "main_inv",
+        {str(e): i for i, (s, e) in enumerate(blocks)},
+        stride,
+        0,
+    )
+    reconcile.set_effective_subvol_and_overlap(main_map.shape[1:][::-1], (0, 0, 0))
+    size = (*main_map.shape[2:][::-1], end_section - start_section)
+    main_box = bounding_box.BoundingBox(start=(0, 0, start_section), size=size)
+    return reconcile.process(
+        subvolume.Subvolume(main_map[:, start_section:end_section], main_box)
+    ).data
+
+
 @flow(
     name="Warp sections",
     persist_result=True,
@@ -152,43 +196,61 @@ def warp_sections(
     z_offset: int,
     yx_start: list[int],
     yx_size: list[int],
-    map_dicts: List[dict],
-    stride: float,
+    blocks: list[tuple[int, int]],
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    last_inv_map_zarr_dict: dict,
+    stride: int,
 ):
     source_volume = ZarrSource(**source_volume_dict)
     target_volume = ZarrSource(**target_volume_dict)
-    maps = [NumpyTarget(**d) for d in map_dicts]
 
-    if start_section == 0:
-        assert z_offset == 0
-        copy_first_section(
-            source_volume,
-            target_volume,
-            z=start_section,
-            yx_start=yx_start,
-            yx_size=yx_size,
-        )
-        start_section += 1
+    main_map = reconcile_flow(
+        blocks=blocks,
+        main_map_zarr_dict=main_map_zarr_dict,
+        main_inv_map_zarr_dict=main_inv_map_zarr_dict,
+        cross_block_map_zarr_dict=cross_block_map_zarr_dict,
+        cross_block_inv_map_zarr_dict=cross_block_inv_map_zarr_dict,
+        last_inv_map_zarr_dict=last_inv_map_zarr_dict,
+        stride=stride,
+        start_section=start_section,
+        end_section=end_section,
+    )
 
+    buffer = []
     warped_sections = []
     for i, z in enumerate(range(start_section, end_section)):
-        warped_sections.append(
-            warp_section(
+        buffer.append(
+            warp_section.submit(
                 source_volume,
                 target_zarr=target_volume,
                 yx_start=yx_start,
                 yx_size=yx_size,
                 z=z,
                 z_offset=z_offset,
-                map=maps[i],
+                map_data=main_map[:, i : i + 1],
                 stride=stride,
             )
         )
 
+        wait_for_task_run(
+            results=warped_sections,
+            buffer=buffer,
+            max_buffer_length=2,
+        )
+
+    wait_for_task_run(
+        results=warped_sections,
+        buffer=buffer,
+        max_buffer_length=0,
+    )
+
     return warped_sections
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def submit_flows(
     source_volume_dict: dict,
     target_volume_dict: dict,
@@ -197,23 +259,17 @@ def submit_flows(
     z_offset: int,
     yx_start: list[int],
     yx_size: list[int],
-    map_dicts: List[dict],
+    blocks: list[tuple[int, int]],
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    last_inv_map_zarr_dict: dict,
     stride: float,
 ):
     n_sections_per_job = 25
     warped_sections = []
     for i, z in enumerate(range(start_section, end_section, n_sections_per_job)):
-        if start_section == 0:
-            # Special case:
-            # There is no flow for the zeroth section
-            if z == 0:
-                maps = map_dicts[: (i + 1) * n_sections_per_job - 1]
-            else:
-                start = i * n_sections_per_job - 1
-                maps = map_dicts[start : start + n_sections_per_job]
-        else:
-            start = i * n_sections_per_job
-            maps = map_dicts[start : start + n_sections_per_job]
 
         run: FlowRun = run_deployment(
             name="Warp sections/default",
@@ -225,7 +281,12 @@ def submit_flows(
                 "z_offset": z_offset,
                 "yx_start": yx_start,
                 "yx_size": yx_size,
-                "map_dicts": maps,
+                "blocks": blocks,
+                "main_map_zarr_dict": main_map_zarr_dict,
+                "main_inv_map_zarr_dict": main_inv_map_zarr_dict,
+                "cross_block_map_zarr_dict": cross_block_map_zarr_dict,
+                "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr_dict,
+                "last_inv_map_zarr_dict": last_inv_map_zarr_dict,
                 "stride": stride,
             },
             client=get_client(),
@@ -249,7 +310,12 @@ def warp_volume(
     end_section: int,
     yx_start: list[int],
     yx_size: list[int],
-    map_dicts: List[dict],
+    blocks: list[tuple[int, int]],
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    last_inv_map_zarr_dict: dict,
     stride: float,
     parallelization: int = 5,
 ):
@@ -269,12 +335,6 @@ def warp_volume(
 
     runs = []
     for i in range(parallelization - 1):
-        if start == 0:
-            # There is no flow for the first (zeroth) section
-            maps = map_dicts[: start + split - 1]
-        else:
-            maps = map_dicts[start - 1 : start + split - 1]
-
         runs.append(
             submit_flows.submit(
                 source_volume_dict=src_volume.serialize(),
@@ -284,7 +344,12 @@ def warp_volume(
                 z_offset=z_offset,
                 yx_start=yx_start,
                 yx_size=yx_size,
-                map_dicts=maps,
+                blocks=blocks,
+                main_map_zarr_dict=main_map_zarr_dict,
+                main_inv_map_zarr_dict=main_inv_map_zarr_dict,
+                cross_block_map_zarr_dict=cross_block_map_zarr_dict,
+                cross_block_inv_map_zarr_dict=cross_block_inv_map_zarr_dict,
+                last_inv_map_zarr_dict=last_inv_map_zarr_dict,
                 stride=stride,
             )
         )
@@ -299,7 +364,12 @@ def warp_volume(
             z_offset=z_offset,
             yx_start=yx_start,
             yx_size=yx_size,
-            map_dicts=map_dicts[start - 1 :],
+            blocks=blocks,
+            main_map_zarr_dict=main_map_zarr_dict,
+            main_inv_map_zarr_dict=main_inv_map_zarr_dict,
+            cross_block_map_zarr_dict=cross_block_map_zarr_dict,
+            cross_block_inv_map_zarr_dict=cross_block_inv_map_zarr_dict,
+            last_inv_map_zarr_dict=last_inv_map_zarr_dict,
             stride=stride,
         )
     )

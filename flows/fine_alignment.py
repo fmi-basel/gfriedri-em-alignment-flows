@@ -11,11 +11,16 @@ import jax.numpy as jnp
 import numpy as np
 import pkg_resources
 import psutil
+import zarr
 from connectomics.common import bounding_box
 from cpr.numpy.NumpyTarget import NumpyTarget
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
 from cpr.zarr.ZarrSource import ZarrSource
+from faim_prefect.parallelization.utils import wait_for_task_run
+from numcodecs import Blosc
+from numpy._typing import ArrayLike
+from ome_zarr.io import parse_url
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.context import FlowRunContext, TaskRunContext, get_run_context
@@ -25,6 +30,8 @@ from pydantic import BaseModel
 from skimage.measure import block_reduce
 from sofima import flow_field, flow_utils, map_utils, mesh
 from tqdm.auto import tqdm
+
+from flows.utils.storage_key import RESULT_STORAGE_KEY
 
 
 class MeshIntegrationConfig(BaseModel):
@@ -39,6 +46,7 @@ class MeshIntegrationConfig(BaseModel):
     start_cap: float = 0.01
     final_cap: float = 10
     prefer_orig_order: bool = True
+    block_size: int = 500
 
 
 class FlowComputationConfig(BaseModel):
@@ -64,9 +72,34 @@ class WarpConfig(BaseModel):
     parallelization: int = 16
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def load_section(path: str, z: int) -> ZarrSource:
     return ZarrSource.from_path(path, group="0", slices_start=[z], slices_stop=[z + 1])
+
+
+def clean_flow(
+    flow,
+    patch_size: int,
+    stride: int,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+):
+    flow = flow[np.newaxis]
+    flow = np.transpose(flow, [1, 0, 2, 3])
+    pad = patch_size // 2 // stride
+    flow = np.pad(
+        flow, [[0, 0], [0, 0], [pad, pad], [pad, pad]], constant_values=np.nan
+    )
+
+    return flow_utils.clean_flow(
+        flow,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
 
 
 def exlude_semaphore_task_input_hash(
@@ -82,7 +115,9 @@ def exlude_semaphore_task_input_hash(
     return task_input_hash(context, hash_args)
 
 
-@task(cache_key_fn=exlude_semaphore_task_input_hash)
+@task(
+    cache_key_fn=exlude_semaphore_task_input_hash, result_storage_key=RESULT_STORAGE_KEY
+)
 def compute_flow_field(
     mfc,
     prev,
@@ -92,6 +127,12 @@ def compute_flow_field(
     patch_size,
     stride,
     batch_size,
+    min_peak_ratio: float,
+    min_peak_sharpness: float,
+    max_magnitude: float,
+    max_deviation: float,
+    max_gradient: float,
+    min_patch_size: int,
     gpu_sem: threading.Semaphore,
 ):
     logger = get_run_logger()
@@ -147,13 +188,40 @@ def compute_flow_field(
     mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
     logger.info(f"[End] Process memory usage: {mem_usage} GB")
 
-    os.makedirs(join(out_dir, str(z)), exist_ok=True)
-    ff1x = NumpyTarget.from_path(join(out_dir, str(z), f"flows1x_{z - 1}_to_{z}.npy"))
-    ff1x.set_data(flows1x)
+    flows1x = clean_flow(
+        flows1x,
+        patch_size=patch_size,
+        stride=stride,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
 
-    ff2x = NumpyTarget.from_path(join(out_dir, str(z), f"flows2x_{z - 1}_to_{z}.npy"))
-    ff2x.set_data(flows2x)
-    return ff1x, ff2x
+    flows2x = clean_flow(
+        flows2x,
+        patch_size=patch_size,
+        stride=stride,
+        min_peak_ratio=min_peak_ratio,
+        min_peak_sharpness=min_peak_sharpness,
+        max_magnitude=max_magnitude,
+        max_deviation=max_deviation,
+    )
+
+    final_flow = compute_final_flow(
+        flows1x,
+        flows2x,
+        max_gradient=max_gradient,
+        max_deviation=max_deviation,
+        min_patch_size=min_patch_size,
+    )
+
+    final_flow_output = NumpyTarget.from_path(
+        join(out_dir, f"final_flow_{z - 1}_to_{z}.npy")
+    )
+    final_flow_output.set_data(final_flow)
+
+    return final_flow_output
 
 
 @flow(
@@ -171,11 +239,17 @@ def flow_field_estimation(
     patch_size: int = 160,
     stride: int = 40,
     batch_size: int = 256,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+    max_gradient: float = 0,
+    min_patch_size: int = 400,
 ):
     mfc = flow_field.JAXMaskedXCorrWithStatsCalculator()
     gpu_sem = threading.Semaphore(1)
     sections = []
-    flows1x, flows2x = [], []
+    final_flows = []
 
     prev = load_section(path, start_section)
     for i in range(start_section + 1, end_section + 1):
@@ -197,73 +271,42 @@ def flow_field_estimation(
                 patch_size=patch_size,
                 stride=stride,
                 batch_size=batch_size,
+                min_peak_ratio=min_peak_ratio,
+                min_peak_sharpness=min_peak_sharpness,
+                max_magnitude=max_magnitude,
+                max_deviation=max_deviation,
+                max_gradient=max_gradient,
+                min_patch_size=min_patch_size,
                 gpu_sem=gpu_sem,
             )
         )
         prev = curr
 
-        while len(buffer) >= 4:
-            flow1x, flow2x = buffer[0].result()
-            flows1x.append(flow1x)
-            flows2x.append(flow2x)
-            buffer = buffer[1:]
+        wait_for_task_run(
+            results=final_flows,
+            buffer=buffer,
+            max_buffer_length=4,
+            result_insert_fn=lambda r: r.result(),
+        )
 
     # Wait for all tasks to finish and collect results
-    while len(buffer) > 0:
-        flow1x, flow2x = buffer[0].result()
-        flows1x.append(flow1x)
-        flows2x.append(flow2x)
-        buffer = buffer[1:]
-
-    return flows1x, flows2x
-
-
-@task(cache_key_fn=task_input_hash)
-def load_flows(
-    flow_list: List[NumpyTarget],
-    patch_size: int,
-    stride: int,
-    out_dir: str,
-    min_peak_ratio: float = 1.6,
-    min_peak_sharpness: float = 1.6,
-    max_magnitude: float = 80,
-    max_deviation: float = 20,
-):
-    flows = []
-    for f in flow_list:
-        flows.append(f.get_data())
-
-    flows = np.transpose(np.array(flows), [1, 0, 2, 3])
-    pad = patch_size // 2 // stride
-    flows = np.pad(
-        flows, [[0, 0], [0, 0], [pad, pad], [pad, pad]], constant_values=np.nan
+    wait_for_task_run(
+        results=final_flows,
+        buffer=buffer,
+        max_buffer_length=0,
+        result_insert_fn=lambda r: r.result(),
     )
 
-    flow = flow_utils.clean_flow(
-        flows,
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-
-    os.makedirs(out_dir, exist_ok=True)
-    output = NumpyTarget.from_path(join(out_dir, "clean_flows.npy"))
-    output.set_data(flow)
-    return output
+    return final_flows
 
 
-@task(cache_key_fn=task_input_hash)
 def compute_final_flow(
-    flow1x: NumpyTarget,
-    flow2x: NumpyTarget,
+    f1: ArrayLike,
+    f2: ArrayLike,
     max_gradient: float,
     max_deviation: float,
     min_patch_size: int,
-    out_dir: str,
 ):
-    f1 = flow1x.get_data()
-    f2 = flow2x.get_data()
     f2_hires = np.zeros_like(f1)
 
     scale = 0.5
@@ -281,26 +324,27 @@ def compute_final_flow(
         )
         f2_hires[:, z : z + 1, ...] = resampled / scale
 
-    final_flow = flow_utils.reconcile_flows(
+    return flow_utils.reconcile_flows(
         (f1, f2_hires),
         max_gradient=max_gradient,
         max_deviation=max_deviation,
         min_patch_size=min_patch_size,
     )
 
-    os.makedirs(out_dir, exist_ok=True)
-    output = NumpyTarget.from_path(join(out_dir, "final_flow.npy"))
-    output.set_data(final_flow)
-    return output
 
-
-@task(cache_key_fn=task_input_hash)
-def run_mesh_optimization(
-    flow: NumpyTarget,
-    out_dir: str,
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
+def run_block_mesh_optimization(
+    final_flows: list[NumpyTarget],
+    start_section: int,
+    block_index: int,
+    main_map_zarr: ZarrSource,
+    main_inv_map_zarr: ZarrSource,
+    cross_block_flow_zarr: ZarrSource,
+    last_inv_map_zarr: ZarrSource,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
+    logger = get_run_logger()
     config = mesh.IntegrationConfig(
         dt=integration_config.dt,
         gamma=integration_config.gamma,
@@ -315,88 +359,77 @@ def run_mesh_optimization(
         final_cap=integration_config.final_cap,
         prefer_orig_order=integration_config.prefer_orig_order,
     )
-
-    final_flow = flow.get_data()
-    solved = [np.zeros_like(final_flow[:, 0:1, ...])]
+    final_flow = np.concatenate([ff.get_data() for ff in final_flows], axis=1)
     origin = jnp.array([0.0, 0.0])
 
+    solved = main_map_zarr.get_data()
+    inv_map = main_inv_map_zarr.get_data()
+    cross_block_flow = cross_block_flow_zarr.get_data()
+    last_inv = last_inv_map_zarr.get_data()
     for z in tqdm(range(0, final_flow.shape[1])):
+        prev_solved = solved[:, start_section + z : start_section + z + 1, ...]
+
         prev = map_utils.compose_maps_fast(
-            final_flow[:, z : z + 1, ...], origin, stride, solved[-1], origin, stride
+            final_flow[:, z : z + 1, ...],
+            origin,
+            stride,
+            prev_solved,
+            origin,
+            stride,
         )
-        x = np.zeros_like(solved[0])
+        x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
+        logger.info(f"Relaxing mesh for section {start_section + z + 1}.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
-        solved.append(x)
+        map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
+        if z + 1 < final_flow.shape[1]:
+            solved[:, start_section + z + 1 : start_section + z + 2] = x
+            inv_map[
+                :, start_section + z + 1 : start_section + z + 2
+            ] = map_utils.invert_map(x, map_box, map_box, stride)
+        else:
+            if start_section + z + 1 == solved.shape[1] - 1:
+                solved[:, start_section + z + 1 : start_section + z + 2] = x
+            cross_block_flow[:, block_index : block_index + 1] = x
+            last_inv[
+                :, start_section + z + 1 : start_section + z + 2
+            ] = map_utils.invert_map(x, map_box, map_box, stride)
 
-    solved = np.concatenate(solved, axis=1)
-
-    outputs = []
-    for z in range(1, solved.shape[1]):
-        out = NumpyTarget.from_path(join(out_dir, f"map_{z}.npy"))
-        out.set_data(solved[:, z : z + 1])
-        outputs.append(out)
-
-    return outputs
+    return main_map_zarr, main_inv_map_zarr, cross_block_flow_zarr, last_inv_map_zarr
 
 
 @flow(
-    name="Optimize mesh",
+    name="Optimize block mesh",
     persist_result=True,
     result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
 )
-def optimize_mesh(
-    flows_1x_dicts: List[dict],
-    flows_2x_dicts: List[dict],
-    out_dir: str,
-    patch_size: int,
+def optimize_block_mesh(
+    final_flow_dicts: List[dict],
+    start_section: int,
+    block_index: int,
+    main_map_zarr_dict: dict,
+    main_inv_map_zarr_dict: dict,
+    cross_block_flow_zarr_dict: dict,
+    last_inv_map_zarr_dict: dict,
     stride: int,
-    min_peak_ratio: float,
-    min_peak_sharpness: float,
-    max_magnitude: float,
-    max_deviation: float,
-    max_gradient: float,
-    min_patch_size: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
-    flows_1x = [NumpyTarget(**d) for d in flows_1x_dicts]
-    flows_2x = [NumpyTarget(**d) for d in flows_2x_dicts]
+    final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
+    main_map_zarr = ZarrSource(**main_map_zarr_dict)
+    main_inv_map_zarr = ZarrSource(**main_inv_map_zarr_dict)
+    cross_block_flow_zarr = ZarrSource(**cross_block_flow_zarr_dict)
+    last_inv_map_zarr = ZarrSource(**last_inv_map_zarr_dict)
 
-    flows1x = load_flows.submit(
-        flows_1x,
-        patch_size=patch_size,
-        stride=stride,
-        out_dir=join(out_dir, "clean_flow1x"),
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-    flows2x = load_flows.submit(
-        flows_2x,
-        patch_size=patch_size,
-        stride=stride,
-        out_dir=join(out_dir, "clean_flow2x"),
-        min_peak_ratio=min_peak_ratio,
-        min_peak_sharpness=min_peak_sharpness,
-        max_magnitude=max_magnitude,
-        max_deviation=max_deviation,
-    )
-
-    final_flow = compute_final_flow(
-        flows1x,
-        flows2x,
-        max_gradient=max_gradient,
-        max_deviation=max_deviation,
-        min_patch_size=min_patch_size,
-        out_dir=out_dir,
-    )
-
-    maps = run_mesh_optimization(
-        flow=final_flow,
-        out_dir=out_dir,
+    maps = run_block_mesh_optimization(
+        final_flows=final_flows,
+        start_section=start_section,
+        block_index=block_index,
+        main_map_zarr=main_map_zarr,
+        main_inv_map_zarr=main_inv_map_zarr,
+        cross_block_flow_zarr=cross_block_flow_zarr,
+        last_inv_map_zarr=last_inv_map_zarr,
         stride=stride,
         integration_config=integration_config,
     )
@@ -404,7 +437,7 @@ def optimize_mesh(
     return maps
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def submit_flows(
     start_section: int,
     end_section: int,
@@ -414,8 +447,14 @@ def submit_flows(
     patch_size: int,
     stride: int,
     batch_size: int,
+    min_peak_ratio: float = 1.6,
+    min_peak_sharpness: float = 1.6,
+    max_magnitude: float = 80,
+    max_deviation: float = 20,
+    max_gradient: float = 0,
+    min_patch_size: int = 400,
 ):
-    flows1x, flows2x = [], []
+    final_flows = []
     for z in range(start_section, end_section, chunk_size):
         run: FlowRun = run_deployment(
             name="Estimate flow-field/default",
@@ -427,15 +466,19 @@ def submit_flows(
                 "patch_size": patch_size,
                 "stride": stride,
                 "batch_size": batch_size,
+                "min_peak_ratio": min_peak_ratio,
+                "min_peak_sharpness": min_peak_sharpness,
+                "max_magnitude": max_magnitude,
+                "max_deviation": max_deviation,
+                "max_gradient": max_gradient,
+                "min_patch_size": min_patch_size,
             },
             client=get_client(),
         )
 
-        f1x, f2x = run.state.result()
-        flows1x.extend(f1x)
-        flows2x.extend(f2x)
+        final_flows.extend(run.state.result())
 
-    return flows1x, flows2x
+    return final_flows
 
 
 def write_alignment_info(
@@ -496,17 +539,17 @@ def write_alignment_info(
         f.write(content)
 
 
-@task(cache_key_fn=task_input_hash)
-def start_mesh_optimization(parameters):
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
+def start_block_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
-        name="Optimize mesh/default",
+        name="Optimize block mesh/default",
         parameters=parameters,
         client=get_client(),
     )
     return run.state.result()
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def start_warping(parameters):
     run: FlowRun = run_deployment(
         name="Warp volume/default",
@@ -515,6 +558,74 @@ def start_warping(parameters):
     )
 
     return run.state.result()
+
+
+@flow(
+    name="Relax cross block mesh",
+    persist_result=True,
+    result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
+    result_serializer=cpr_serializer(),
+    cache_result_in_memory=False,
+)
+def relax_cross_block_mesh(
+    cross_block_flow_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    main_map_size: tuple[int, int, int],
+    integration_config: MeshIntegrationConfig,
+    stride: int,
+):
+    cross_block_flow = ZarrSource(**cross_block_flow_zarr_dict).get_data()
+    cross_block_map = ZarrSource(**cross_block_map_zarr_dict).get_data()
+    cross_block_inv_map = ZarrSource(**cross_block_inv_map_zarr_dict).get_data()
+    map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=main_map_size)
+    map2x_box = map_box.scale(0.5)
+    xblk_stride = stride * 2
+
+    x_block_flow = map_utils.resample_map(
+        cross_block_flow, map_box, map2x_box, stride, xblk_stride
+    )
+
+    xblk_config = mesh.IntegrationConfig(
+        dt=integration_config.dt,
+        gamma=integration_config.gamma,
+        k0=0.001,
+        k=integration_config.k,
+        stride=xblk_stride,
+        num_iters=integration_config.num_iters,
+        max_iters=integration_config.max_iters,
+        stop_v_max=integration_config.stop_v_max,
+        dt_max=integration_config.dt_max,
+        start_cap=integration_config.start_cap,
+        final_cap=integration_config.final_cap,
+        prefer_orig_order=integration_config.prefer_orig_order,
+    )
+    origin = jnp.array([0.0, 0.0])
+    xblk = []
+    for z in range(x_block_flow.shape[1]):
+        if z == 0:
+            prev = x_block_flow[:, z : z + 1, ...]
+        else:
+            prev = map_utils.compose_maps_fast(
+                x_block_flow[:, z : z + 1, ...],
+                origin,
+                xblk_stride,
+                xblk[-1],
+                origin,
+                xblk_stride,
+            )
+        x = np.zeros_like(x_block_flow[:, 0:1, ...])
+        x, e_kin, num_steps = mesh.relax_mesh(x, prev, xblk_config)
+        x = np.array(x)
+        xblk.append(x)
+
+    xblk = np.concatenate(xblk, axis=1)
+    cross_block_map[:, :, ...] = map_utils.resample_map(
+        xblk, map2x_box, map_box, stride * 2, stride
+    )
+    cross_block_inv_map[:, :, ...] = map_utils.invert_map(
+        cross_block_map[:], map_box, map_box, stride
+    )
 
 
 @flow(
@@ -552,6 +663,12 @@ def parallel_flow_field_estimation(
                 patch_size=flow_config.patch_size,
                 stride=flow_config.stride,
                 batch_size=flow_config.batch_size,
+                min_peak_ratio=flow_config.min_peak_ratio,
+                min_peak_sharpness=flow_config.min_peak_sharpness,
+                max_magnitude=flow_config.max_magnitude,
+                max_deviation=flow_config.max_deviation,
+                max_gradient=flow_config.max_gradient,
+                min_patch_size=flow_config.min_patch_size,
             )
         )
         start = start + split
@@ -566,42 +683,142 @@ def parallel_flow_field_estimation(
             patch_size=flow_config.patch_size,
             stride=flow_config.stride,
             batch_size=flow_config.batch_size,
+            min_peak_ratio=flow_config.min_peak_ratio,
+            min_peak_sharpness=flow_config.min_peak_sharpness,
+            max_magnitude=flow_config.max_magnitude,
+            max_deviation=flow_config.max_deviation,
+            max_gradient=flow_config.max_gradient,
+            min_patch_size=flow_config.min_patch_size,
         )
     )
 
-    flows1x, flows2x = [], []
+    final_flows = []
     for run in runs:
-        f1x, f2x = run.result()
-        flows1x.extend(f1x)
-        flows2x.extend(f2x)
+        final_flows.extend(run.result())
 
-    serialized_f1x = []
-    serialized_f2x = []
-    for f1, f2 in zip(flows1x, flows2x):
-        serialized_f1x.append(f1.serialize())
-        serialized_f2x.append(f2.serialize())
+    serialized_final_flows = []
+    for final_flow in final_flows:
+        serialized_final_flows.append(final_flow.serialize())
 
-    map_dir = join(result_dir, "maps")
-    os.makedirs(map_dir, exist_ok=True)
+    # Optimize z-alignment in chunks/blocks
+    store = parse_url(path=join(result_dir, "maps.zarr"), mode="w").store
+    map_zarr: zarr.Group = zarr.group(store=store)
 
-    opt_mesh_parameters = {
-        "flows_1x_dicts": serialized_f1x,
-        "flows_2x_dicts": serialized_f2x,
-        "out_dir": map_dir,
-        "patch_size": flow_config.patch_size,
-        "stride": flow_config.stride,
-        "min_peak_ratio": flow_config.min_peak_ratio,
-        "min_peak_sharpness": flow_config.min_peak_sharpness,
-        "max_magnitude": flow_config.max_magnitude,
-        "max_deviation": flow_config.max_deviation,
-        "max_gradient": flow_config.max_gradient,
-        "min_patch_size": flow_config.min_patch_size,
-        "integration_config": integration_config,
-    }
+    shape = final_flows[0].get_data().shape[2:]
+    map_zarr.create_dataset(
+        name="main",
+        shape=(2, len(final_flows) + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="main_inv",
+        shape=(2, len(final_flows) + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="cross_block_flow",
+        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="cross_block",
+        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="cross_block_inv",
+        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="last_inv",
+        shape=(2, len(final_flows) + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    main_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="main", mode="w"
+    )
+    main_inv_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="main_inv", mode="w"
+    )
+    cross_block_flow_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="cross_block_flow", mode="w"
+    )
+    cross_block_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="cross_block", mode="w"
+    )
+    cross_block_inv_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="cross_block_inv", mode="w"
+    )
+    last_inv_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="last_inv", mode="w"
+    )
+    runs = []
+    blocks = []
+    for block_index, i in enumerate(
+        range(0, len(final_flows), integration_config.block_size)
+    ):
+        start = i
+        end = min(start + integration_config.block_size, len(final_flows))
+        blocks.append((start, end))
+        opt_mesh_parameters = {
+            "final_flow_dicts": serialized_final_flows[start:end],
+            "start_section": start,
+            "block_index": block_index,
+            "main_map_zarr_dict": main_map_zarr.serialize(),
+            "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
+            "cross_block_flow_zarr_dict": cross_block_flow_zarr.serialize(),
+            "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
+            "stride": flow_config.stride,
+            "integration_config": integration_config,
+        }
 
-    maps = start_mesh_optimization(parameters=opt_mesh_parameters)
+        runs.append(
+            start_block_mesh_optimization.submit(parameters=opt_mesh_parameters)
+        )
 
-    map_dicts = [m.serialize() for m in maps]
+    for run in runs:
+        run.wait()
+
+    run: FlowRun = run_deployment(
+        name="Relax cross block mesh/default",
+        parameters={
+            "cross_block_flow_zarr_dict": cross_block_flow_zarr.serialize(),
+            "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+            "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
+            "main_map_size": main_map_zarr.get_data().shape[1:][::-1],
+            "integration_config": integration_config,
+            "stride": flow_config.stride,
+        },
+        client=get_client(),
+    )
+
+    if run.state.is_failed():
+        raise RuntimeError(run.state.message)
 
     warp_parameters = {
         "source_volume": coarse_volume_path,
@@ -610,7 +827,12 @@ def parallel_flow_field_estimation(
         "end_section": warp_config.end_section,
         "yx_start": warp_config.yx_start,
         "yx_size": warp_config.yx_size,
-        "map_dicts": map_dicts,
+        "blocks": blocks,
+        "main_map_zarr_dict": main_map_zarr.serialize(),
+        "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
+        "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+        "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
+        "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
         "stride": flow_config.stride,
         "parallelization": warp_config.parallelization,
     }
