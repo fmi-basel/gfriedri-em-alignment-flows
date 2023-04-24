@@ -31,6 +31,8 @@ from skimage.measure import block_reduce
 from sofima import flow_field, flow_utils, map_utils, mesh
 from tqdm.auto import tqdm
 
+from flows.utils.storage_key import RESULT_STORAGE_KEY
+
 
 class MeshIntegrationConfig(BaseModel):
     dt: float = 0.001
@@ -70,7 +72,7 @@ class WarpConfig(BaseModel):
     parallelization: int = 16
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def load_section(path: str, z: int) -> ZarrSource:
     return ZarrSource.from_path(path, group="0", slices_start=[z], slices_stop=[z + 1])
 
@@ -113,7 +115,9 @@ def exlude_semaphore_task_input_hash(
     return task_input_hash(context, hash_args)
 
 
-@task(cache_key_fn=exlude_semaphore_task_input_hash)
+@task(
+    cache_key_fn=exlude_semaphore_task_input_hash, result_storage_key=RESULT_STORAGE_KEY
+)
 def compute_flow_field(
     mfc,
     prev,
@@ -328,18 +332,19 @@ def compute_final_flow(
     )
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def run_block_mesh_optimization(
     final_flows: list[NumpyTarget],
     start_section: int,
     block_index: int,
     main_map_zarr: ZarrSource,
     main_inv_map_zarr: ZarrSource,
-    cross_block_map_zarr: ZarrSource,
+    cross_block_flow_zarr: ZarrSource,
     last_inv_map_zarr: ZarrSource,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
 ):
+    logger = get_run_logger()
     config = mesh.IntegrationConfig(
         dt=integration_config.dt,
         gamma=integration_config.gamma,
@@ -359,10 +364,8 @@ def run_block_mesh_optimization(
 
     solved = main_map_zarr.get_data()
     inv_map = main_inv_map_zarr.get_data()
-    cross_block_flow = cross_block_map_zarr.get_data()
+    cross_block_flow = cross_block_flow_zarr.get_data()
     last_inv = last_inv_map_zarr.get_data()
-    get_run_logger().info(f"start_seciton = {start_section}")
-    get_run_logger().info(f"final_flow.shape = {final_flow.shape}")
     for z in tqdm(range(0, final_flow.shape[1])):
         prev_solved = solved[:, start_section + z : start_section + z + 1, ...]
 
@@ -375,6 +378,7 @@ def run_block_mesh_optimization(
             stride,
         )
         x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
+        logger.info(f"Relaxing mesh for section {start_section + z + 1}.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
@@ -391,7 +395,7 @@ def run_block_mesh_optimization(
                 :, start_section + z + 1 : start_section + z + 2
             ] = map_utils.invert_map(x, map_box, map_box, stride)
 
-    return main_map_zarr, main_inv_map_zarr, cross_block_map_zarr, last_inv_map_zarr
+    return main_map_zarr, main_inv_map_zarr, cross_block_flow_zarr, last_inv_map_zarr
 
 
 @flow(
@@ -407,7 +411,7 @@ def optimize_block_mesh(
     block_index: int,
     main_map_zarr_dict: dict,
     main_inv_map_zarr_dict: dict,
-    cross_block_map_zarr_dict: dict,
+    cross_block_flow_zarr_dict: dict,
     last_inv_map_zarr_dict: dict,
     stride: int,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
@@ -415,7 +419,7 @@ def optimize_block_mesh(
     final_flows = [NumpyTarget(**d) for d in final_flow_dicts]
     main_map_zarr = ZarrSource(**main_map_zarr_dict)
     main_inv_map_zarr = ZarrSource(**main_inv_map_zarr_dict)
-    cross_block_map_zarr = ZarrSource(**cross_block_map_zarr_dict)
+    cross_block_flow_zarr = ZarrSource(**cross_block_flow_zarr_dict)
     last_inv_map_zarr = ZarrSource(**last_inv_map_zarr_dict)
 
     maps = run_block_mesh_optimization(
@@ -424,7 +428,7 @@ def optimize_block_mesh(
         block_index=block_index,
         main_map_zarr=main_map_zarr,
         main_inv_map_zarr=main_inv_map_zarr,
-        cross_block_map_zarr=cross_block_map_zarr,
+        cross_block_flow_zarr=cross_block_flow_zarr,
         last_inv_map_zarr=last_inv_map_zarr,
         stride=stride,
         integration_config=integration_config,
@@ -433,7 +437,7 @@ def optimize_block_mesh(
     return maps
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def submit_flows(
     start_section: int,
     end_section: int,
@@ -535,7 +539,7 @@ def write_alignment_info(
         f.write(content)
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def start_block_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
         name="Optimize block mesh/default",
@@ -545,7 +549,7 @@ def start_block_mesh_optimization(parameters):
     return run.state.result()
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
 def start_warping(parameters):
     run: FlowRun = run_deployment(
         name="Warp volume/default",
@@ -554,6 +558,74 @@ def start_warping(parameters):
     )
 
     return run.state.result()
+
+
+@flow(
+    name="Relax cross block mesh",
+    persist_result=True,
+    result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
+    result_serializer=cpr_serializer(),
+    cache_result_in_memory=False,
+)
+def relax_cross_block_mesh(
+    cross_block_flow_zarr_dict: dict,
+    cross_block_map_zarr_dict: dict,
+    cross_block_inv_map_zarr_dict: dict,
+    main_map_size: tuple[int, int, int],
+    integration_config: MeshIntegrationConfig,
+    stride: int,
+):
+    cross_block_flow = ZarrSource(**cross_block_flow_zarr_dict).get_data()
+    cross_block_map = ZarrSource(**cross_block_map_zarr_dict).get_data()
+    cross_block_inv_map = ZarrSource(**cross_block_inv_map_zarr_dict).get_data()
+    map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=main_map_size)
+    map2x_box = map_box.scale(0.5)
+    xblk_stride = stride * 2
+
+    x_block_flow = map_utils.resample_map(
+        cross_block_flow, map_box, map2x_box, stride, xblk_stride
+    )
+
+    xblk_config = mesh.IntegrationConfig(
+        dt=integration_config.dt,
+        gamma=integration_config.gamma,
+        k0=0.001,
+        k=integration_config.k,
+        stride=xblk_stride,
+        num_iters=integration_config.num_iters,
+        max_iters=integration_config.max_iters,
+        stop_v_max=integration_config.stop_v_max,
+        dt_max=integration_config.dt_max,
+        start_cap=integration_config.start_cap,
+        final_cap=integration_config.final_cap,
+        prefer_orig_order=integration_config.prefer_orig_order,
+    )
+    origin = jnp.array([0.0, 0.0])
+    xblk = []
+    for z in range(x_block_flow.shape[1]):
+        if z == 0:
+            prev = x_block_flow[:, z : z + 1, ...]
+        else:
+            prev = map_utils.compose_maps_fast(
+                x_block_flow[:, z : z + 1, ...],
+                origin,
+                xblk_stride,
+                xblk[-1],
+                origin,
+                xblk_stride,
+            )
+        x = np.zeros_like(x_block_flow[:, 0:1, ...])
+        x, e_kin, num_steps = mesh.relax_mesh(x, prev, xblk_config)
+        x = np.array(x)
+        xblk.append(x)
+
+    xblk = np.concatenate(xblk, axis=1)
+    cross_block_map[:, :, ...] = map_utils.resample_map(
+        xblk, map2x_box, map_box, stride * 2, stride
+    )
+    cross_block_inv_map[:, :, ...] = map_utils.invert_map(
+        cross_block_map[:], map_box, map_box, stride
+    )
 
 
 @flow(
@@ -652,7 +724,25 @@ def parallel_flow_field_estimation(
         overwrite=True,
     )
     map_zarr.create_dataset(
+        name="cross_block_flow",
+        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
         name="cross_block",
+        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+        chunks=(2, 1, *shape),
+        dtype="<f4",
+        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+        fill_value=0,
+        overwrite=True,
+    )
+    map_zarr.create_dataset(
+        name="cross_block_inv",
         shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
         chunks=(2, 1, *shape),
         dtype="<f4",
@@ -675,8 +765,14 @@ def parallel_flow_field_estimation(
     main_inv_map_zarr = ZarrSource.from_path(
         join(result_dir, "maps.zarr"), group="main_inv", mode="w"
     )
+    cross_block_flow_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="cross_block_flow", mode="w"
+    )
     cross_block_map_zarr = ZarrSource.from_path(
         join(result_dir, "maps.zarr"), group="cross_block", mode="w"
+    )
+    cross_block_inv_map_zarr = ZarrSource.from_path(
+        join(result_dir, "maps.zarr"), group="cross_block_inv", mode="w"
     )
     last_inv_map_zarr = ZarrSource.from_path(
         join(result_dir, "maps.zarr"), group="last_inv", mode="w"
@@ -695,7 +791,7 @@ def parallel_flow_field_estimation(
             "block_index": block_index,
             "main_map_zarr_dict": main_map_zarr.serialize(),
             "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
-            "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+            "cross_block_flow_zarr_dict": cross_block_flow_zarr.serialize(),
             "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
             "stride": flow_config.stride,
             "integration_config": integration_config,
@@ -708,6 +804,22 @@ def parallel_flow_field_estimation(
     for run in runs:
         run.wait()
 
+    run: FlowRun = run_deployment(
+        name="Relax cross block mesh/default",
+        parameters={
+            "cross_block_flow_zarr_dict": cross_block_flow_zarr.serialize(),
+            "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+            "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
+            "main_map_size": main_map_zarr.get_data().shape[1:][::-1],
+            "integration_config": integration_config,
+            "stride": flow_config.stride,
+        },
+        client=get_client(),
+    )
+
+    if run.state.is_failed():
+        raise RuntimeError(run.state.message)
+
     warp_parameters = {
         "source_volume": coarse_volume_path,
         "target_volume": join(result_dir, warp_config.target_volume_name),
@@ -719,8 +831,8 @@ def parallel_flow_field_estimation(
         "main_map_zarr_dict": main_map_zarr.serialize(),
         "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
         "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+        "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
         "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
-        "integration_config": integration_config,
         "stride": flow_config.stride,
         "parallelization": warp_config.parallelization,
     }
