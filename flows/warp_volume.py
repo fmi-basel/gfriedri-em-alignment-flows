@@ -266,9 +266,19 @@ def warp_sections(
     memory_lock = Semaphore(8)
     warped_sections = []
     buffer = []
-    tile_size = 2744 * 2
+    tile_size = 2744 * 3
     for i, z in enumerate(range(start_section, end_section)):
-        inv_map, box = compute_inv_map(map_data=main_map[:, i : i + 1], stride=stride)
+        task_run = compute_inv_map.submit(
+            map_data=main_map[:, i : i + 1], stride=stride
+        )
+
+        wait_for_task_run(
+            results=warped_sections,
+            buffer=buffer,
+            max_buffer_length=0,
+        )
+
+        inv_map, box = task_run.result()
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
             for x in range(yx_start[1], yx_start[1] + yx_size[1], tile_size):
                 buffer.append(
@@ -288,12 +298,6 @@ def warp_sections(
                         memory_lock=memory_lock,
                     )
                 )
-
-        wait_for_task_run(
-            results=warped_sections,
-            buffer=buffer,
-            max_buffer_length=0,
-        )
 
     return warped_sections
 
