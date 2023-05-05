@@ -1,10 +1,12 @@
 import gc
+import os
 import threading
 from pathlib import Path
 from threading import Semaphore
 from typing import Any, Optional
 
 import numpy as np
+import psutil
 import zarr
 from connectomics.common import bounding_box
 from connectomics.volume import subvolume
@@ -256,6 +258,8 @@ def warp_sections(
     buffer = []
     tile_size = 2744 * 2
     for i, z in enumerate(range(start_section, end_section)):
+        mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
+        get_run_logger().info(f"Process memory usage: {mem_usage} GB")
         main_map = reconcile_flow.submit(
             blocks=blocks,
             main_map_zarr_dict=main_map_zarr_dict,
