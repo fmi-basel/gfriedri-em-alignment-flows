@@ -274,6 +274,7 @@ def warp_sections(
             buffer=buffer,
             max_buffer_length=0,
         )
+        gc.collect()
 
         inv_map, box = task_run.result()
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
