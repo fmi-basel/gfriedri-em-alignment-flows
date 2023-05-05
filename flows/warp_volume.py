@@ -1,5 +1,8 @@
 import gc
+import threading
 from pathlib import Path
+from threading import Semaphore
+from typing import Any, Optional
 
 import numpy as np
 import zarr
@@ -13,6 +16,7 @@ from numpy._typing import ArrayLike
 from ome_zarr.io import parse_url
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
+from prefect.context import TaskRunContext
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
 from sofima import map_utils, warp
@@ -45,7 +49,20 @@ def create_output_volume(
     return ZarrSource.from_path(target_volume, group="0", mode="w")
 
 
-@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
+def exlude_semaphore_task_input_hash(
+    context: "TaskRunContext", arguments: dict[str, Any]
+) -> Optional[str]:
+    hash_args = {}
+    for k, item in arguments.items():
+        if not isinstance(item, threading.Semaphore):
+            hash_args[k] = item
+
+    return task_input_hash(context, hash_args)
+
+
+@task(
+    cache_key_fn=exlude_semaphore_task_input_hash, result_storage_key=RESULT_STORAGE_KEY
+)
 def warp_section(
     source_volume: ZarrSource,
     target_zarr: ZarrSource,
@@ -59,6 +76,7 @@ def warp_section(
     inv_map: ArrayLike,
     box: bounding_box.BoundingBox,
     stride: float,
+    memory_lock: Semaphore,
 ):
     # TODO: Compute this only once per section.
     # box = bounding_box.BoundingBox(
@@ -83,45 +101,54 @@ def warp_section(
         min(x + tile_size + 500, x + yx_size[1] + 500),
         yx_start[1] + out_vol.shape[2],
     )
-    src_data = section_data[z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x][
-        np.newaxis
-    ]
 
-    img_box = bounding_box.BoundingBox(
-        start=(src_start_x, src_start_y, 0),
-        size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
-    )
+    try:
+        memory_lock.acquire()
+        src_data = section_data[
+            z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
+        ][np.newaxis]
 
-    end_y = min(min(y + tile_size, y + yx_size[0]), yx_start[0] + out_vol.shape[1])
-    end_x = min(min(x + tile_size, x + yx_size[1]), yx_start[1] + out_vol.shape[2])
-    out_box = bounding_box.BoundingBox(start=(x, y, 0), size=(end_x - x, end_y - y, 1))
+        img_box = bounding_box.BoundingBox(
+            start=(src_start_x, src_start_y, 0),
+            size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
+        )
 
-    out_start_y = min(y, y - yx_start[0])
-    out_start_x = min(x, x - yx_start[1])
-    out_end_y = min(end_y, end_y - yx_start[0])
-    out_end_x = min(end_x, end_x - yx_start[1])
-    logger = get_run_logger()
-    logger.debug(f"y = {y}, x = {x}")
-    logger.debug(f"img_box = {img_box}")
-    logger.debug(f"out_box = {out_box}")
-    logger.debug(f"out_start_y = {out_start_y}, out_end_y = {out_end_y}")
-    logger.debug(f"out_start_x = {out_start_x}, out_end_x = {out_end_x}")
-    out_vol[
-        z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
-    ] = warp.warp_subvolume(
-        src_data,
-        image_box=img_box,
-        coord_map=inv_map,
-        map_box=box,
-        stride=stride,
-        out_box=out_box,
-        interpolation="lanczos",
-        parallelism=1,
-    )[
-        0, 0
-    ]
+        end_y = min(min(y + tile_size, y + yx_size[0]), yx_start[0] + out_vol.shape[1])
+        end_x = min(min(x + tile_size, x + yx_size[1]), yx_start[1] + out_vol.shape[2])
+        out_box = bounding_box.BoundingBox(
+            start=(x, y, 0), size=(end_x - x, end_y - y, 1)
+        )
 
-    gc.collect()
+        out_start_y = min(y, y - yx_start[0])
+        out_start_x = min(x, x - yx_start[1])
+        out_end_y = min(end_y, end_y - yx_start[0])
+        out_end_x = min(end_x, end_x - yx_start[1])
+        logger = get_run_logger()
+        logger.debug(f"y = {y}, x = {x}")
+        logger.debug(f"img_box = {img_box}")
+        logger.debug(f"out_box = {out_box}")
+        logger.debug(f"out_start_y = {out_start_y}, out_end_y = {out_end_y}")
+        logger.debug(f"out_start_x = {out_start_x}, out_end_x = {out_end_x}")
+        out_vol[
+            z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
+        ] = warp.warp_subvolume(
+            src_data,
+            image_box=img_box,
+            coord_map=inv_map,
+            map_box=box,
+            stride=stride,
+            out_box=out_box,
+            interpolation="lanczos",
+            parallelism=1,
+        )[
+            0, 0
+        ]
+
+        gc.collect()
+    except Exception as e:
+        raise e
+    finally:
+        memory_lock.release()
 
     result = ZarrSource.from_path(
         path=target_zarr.get_path(),
@@ -236,8 +263,9 @@ def warp_sections(
         end_section=end_section,
     )
 
-    buffer = []
+    memory_lock = Semaphore(8)
     warped_sections = []
+    buffer = []
     tile_size = 2744 * 4
     for i, z in enumerate(range(start_section, end_section)):
         inv_map, box = compute_inv_map(map_data=main_map[:, i : i + 1], stride=stride)
@@ -257,20 +285,15 @@ def warp_sections(
                         inv_map=inv_map,
                         box=box,
                         stride=stride,
+                        memory_lock=memory_lock,
                     )
                 )
 
-                wait_for_task_run(
-                    results=warped_sections,
-                    buffer=buffer,
-                    max_buffer_length=8,
-                )
-
-    wait_for_task_run(
-        results=warped_sections,
-        buffer=buffer,
-        max_buffer_length=0,
-    )
+        wait_for_task_run(
+            results=warped_sections,
+            buffer=buffer,
+            max_buffer_length=0,
+        )
 
     return warped_sections
 
