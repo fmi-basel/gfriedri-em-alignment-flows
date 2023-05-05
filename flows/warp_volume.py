@@ -253,25 +253,27 @@ def warp_sections(
     source_volume = ZarrSource(**source_volume_dict)
     target_volume = ZarrSource(**target_volume_dict)
 
+    main_map = reconcile_flow(
+        blocks=blocks,
+        main_map_zarr_dict=main_map_zarr_dict,
+        main_inv_map_zarr_dict=main_inv_map_zarr_dict,
+        cross_block_map_zarr_dict=cross_block_map_zarr_dict,
+        cross_block_inv_map_zarr_dict=cross_block_inv_map_zarr_dict,
+        last_inv_map_zarr_dict=last_inv_map_zarr_dict,
+        stride=stride,
+        start_section=start_section,
+        end_section=end_section,
+    )
+
     memory_lock = Semaphore(19)
     warped_sections = []
     buffer = []
     tile_size = 2744 * 2
     for i, z in enumerate(range(start_section, end_section)):
-        mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
-        get_run_logger().info(f"Process memory usage: {mem_usage} GB")
-        main_map = reconcile_flow.submit(
-            blocks=blocks,
-            main_map_zarr_dict=main_map_zarr_dict,
-            main_inv_map_zarr_dict=main_inv_map_zarr_dict,
-            cross_block_map_zarr_dict=cross_block_map_zarr_dict,
-            cross_block_inv_map_zarr_dict=cross_block_inv_map_zarr_dict,
-            last_inv_map_zarr_dict=last_inv_map_zarr_dict,
-            stride=stride,
-            start_section=z,
-            end_section=z + 1,
+
+        task_run = compute_inv_map.submit(
+            map_data=main_map[:, i : i + 1], stride=stride
         )
-        task_run = compute_inv_map.submit(map_data=main_map.result(), stride=stride)
 
         wait_for_task_run(
             results=warped_sections,
@@ -279,6 +281,8 @@ def warp_sections(
             max_buffer_length=0,
         )
         gc.collect()
+        mem_usage = psutil.Process(os.getpid()).memory_info().rss / 1e9
+        get_run_logger().warning(f"Process memory usage: {mem_usage} GB")
 
         inv_map, box = task_run.result()
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
