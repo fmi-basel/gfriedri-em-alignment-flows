@@ -263,10 +263,10 @@ def warp_sections(
         end_section=end_section,
     )
 
-    memory_lock = Semaphore(4)
+    memory_lock = Semaphore(8)
     warped_sections = []
     buffer = []
-    tile_size = 2744 * 4
+    tile_size = 2744 * 2
     for i, z in enumerate(range(start_section, end_section)):
         inv_map, box = compute_inv_map(map_data=main_map[:, i : i + 1], stride=stride)
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
