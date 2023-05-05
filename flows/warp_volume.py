@@ -263,7 +263,7 @@ def warp_sections(
         end_section=end_section,
     )
 
-    memory_lock = Semaphore(8)
+    memory_lock = Semaphore(12)
     warped_sections = []
     buffer = []
     tile_size = 2744 * 3
@@ -299,6 +299,11 @@ def warp_sections(
                     )
                 )
 
+    wait_for_task_run(
+        results=warped_sections,
+        buffer=buffer,
+        max_buffer_length=0,
+    )
     return warped_sections
 
 
