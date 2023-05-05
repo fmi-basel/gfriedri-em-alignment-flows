@@ -254,7 +254,7 @@ def warp_sections(
     memory_lock = Semaphore(12)
     warped_sections = []
     buffer = []
-    tile_size = 2744 * 3
+    tile_size = 2744 * 2
     for i, z in enumerate(range(start_section, end_section)):
         main_map = reconcile_flow.submit(
             blocks=blocks,
