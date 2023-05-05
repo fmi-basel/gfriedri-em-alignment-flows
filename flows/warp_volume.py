@@ -238,7 +238,7 @@ def warp_sections(
 
     buffer = []
     warped_sections = []
-    tile_size = 2744
+    tile_size = 2744 * 4
     for i, z in enumerate(range(start_section, end_section)):
         inv_map, box = compute_inv_map(map_data=main_map[:, i : i + 1], stride=stride)
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
