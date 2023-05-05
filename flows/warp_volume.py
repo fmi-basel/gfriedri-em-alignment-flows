@@ -251,7 +251,7 @@ def warp_sections(
     source_volume = ZarrSource(**source_volume_dict)
     target_volume = ZarrSource(**target_volume_dict)
 
-    memory_lock = Semaphore(12)
+    memory_lock = Semaphore(24)
     warped_sections = []
     buffer = []
     tile_size = 2744 * 2
