@@ -56,13 +56,15 @@ def warp_section(
     z: int,
     tile_size: int,
     z_offset: int,
-    map_data: ArrayLike,
+    inv_map: ArrayLike,
+    box: bounding_box.BoundingBox,
     stride: float,
 ):
-    box = bounding_box.BoundingBox(
-        start=(0, 0, 0), size=(map_data.shape[-1], map_data.shape[-2], 1)
-    )
-    inv_map = map_utils.invert_map(map_data, box, box, stride)
+    # TODO: Compute this only once per section.
+    # box = bounding_box.BoundingBox(
+    #     start=(0, 0, 0), size=(map_data.shape[-1], map_data.shape[-2], 1)
+    # )
+    # inv_map = map_utils.invert_map(map_data, box, box, stride)
 
     section_data = source_volume.get_data()
 
@@ -131,6 +133,11 @@ def warp_section(
     return result
 
 
+@task(
+    persist_result=False,
+    cache_result_in_memory=True,
+    refresh_cache=True,
+)
 def reconcile_flow(
     blocks: list[tuple[int, int]],
     main_map_zarr_dict: dict,
@@ -178,6 +185,19 @@ def reconcile_flow(
     ).data
 
 
+@task(
+    persist_result=False,
+    cache_result_in_memory=True,
+    refresh_cache=True,
+)
+def compute_inv_map(map_data, stride):
+    box = bounding_box.BoundingBox(
+        start=(0, 0, 0), size=(map_data.shape[-1], map_data.shape[-2], 1)
+    )
+    inv_map = map_utils.invert_map(map_data, box, box, stride)
+    return inv_map, box
+
+
 @flow(
     name="Warp sections",
     persist_result=True,
@@ -220,6 +240,7 @@ def warp_sections(
     warped_sections = []
     tile_size = 2744
     for i, z in enumerate(range(start_section, end_section)):
+        inv_map, box = compute_inv_map(map_data=main_map[:, i : i + 1], stride=stride)
         for y in range(yx_start[0], yx_start[0] + yx_size[0], tile_size):
             for x in range(yx_start[1], yx_start[1] + yx_size[1], tile_size):
                 buffer.append(
@@ -233,7 +254,8 @@ def warp_sections(
                         z=z,
                         tile_size=tile_size,
                         z_offset=z_offset,
-                        map_data=main_map[:, i : i + 1],
+                        inv_map=inv_map,
+                        box=box,
                         stride=stride,
                     )
                 )
