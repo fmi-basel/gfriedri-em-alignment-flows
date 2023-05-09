@@ -21,7 +21,7 @@ from prefect.client.schemas import FlowRun
 from prefect.context import TaskRunContext
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
-from prefect.task_runners import ConcurrentTaskRunner
+from prefect_dask import DaskTaskRunner
 from sofima import map_utils, warp
 from sofima.processor import maps
 
@@ -239,7 +239,9 @@ def compute_inv_map(map_data, stride):
     result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
-    task_runner=ConcurrentTaskRunner(),
+    task_runner=DaskTaskRunner(
+        cluster_kwargs={"processes": True, "n_workers": 7, "threads_per_worker": 2},
+    ),
 )
 def warp_sections(
     source_volume_dict: dict,
