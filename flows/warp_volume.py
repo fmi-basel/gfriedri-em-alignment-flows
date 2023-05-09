@@ -239,7 +239,7 @@ def compute_inv_map(map_data, stride):
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
     task_runner=DaskTaskRunner(
-        cluster_kwargs={"processes": True, "n_workers": 7, "threads_per_worker": 2},
+        cluster_kwargs={"processes": True, "n_workers": 5, "threads_per_worker": 1},
     ),
 )
 def warp_sections(
