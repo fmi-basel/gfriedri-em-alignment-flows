@@ -21,6 +21,7 @@ from prefect.client.schemas import FlowRun
 from prefect.context import TaskRunContext
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
+from prefect.task_runners import ConcurrentTaskRunner
 from sofima import map_utils, warp
 from sofima.processor import maps
 
@@ -65,7 +66,7 @@ def exlude_semaphore_task_input_hash(
 @task(
     cache_key_fn=exlude_semaphore_task_input_hash, result_storage_key=RESULT_STORAGE_KEY
 )
-def warp_section(
+async def warp_section(
     source_volume: ZarrSource,
     target_zarr: ZarrSource,
     yx_start: list[int],
@@ -106,9 +107,11 @@ def warp_section(
 
     try:
         memory_lock.acquire()
-        src_data = section_data[
+        src_data = await section_data[
             z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
-        ][np.newaxis]
+        ]
+
+        src_data = src_data[np.newaxis]
 
         img_box = bounding_box.BoundingBox(
             start=(src_start_x, src_start_y, 0),
@@ -233,6 +236,7 @@ def compute_inv_map(map_data, stride):
     result_storage=LocalFileSystem.load("gfriedri-em-alignment-flows-storage"),
     result_serializer=cpr_serializer(),
     cache_result_in_memory=False,
+    task_runner=ConcurrentTaskRunner(),
 )
 def warp_sections(
     source_volume_dict: dict,
@@ -384,7 +388,7 @@ def warp_volume(
 ):
     src_volume = ZarrSource.from_path(source_volume, group="0")
 
-    warped_zarr = create_output_volume(
+    warped_zarr: ZarrSource = create_output_volume(
         source_volume,
         target_volume,
         z_size=end_section - start_section + 1,
