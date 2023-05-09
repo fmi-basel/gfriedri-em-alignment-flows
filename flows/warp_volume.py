@@ -87,8 +87,7 @@ async def warp_section(
     # )
     # inv_map = map_utils.invert_map(map_data, box, box, stride)
 
-    section_data = source_volume.get_data()
-
+    section_data: zarr.Group = source_volume.get_data()
     out_vol = target_zarr.get_data()
 
     # tile_size = 20000
@@ -107,11 +106,9 @@ async def warp_section(
 
     try:
         memory_lock.acquire()
-        src_data = await section_data[
-            z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x
-        ]
-
-        src_data = src_data[np.newaxis]
+        src_data = await load_data(
+            section_data, src_end_x, src_end_y, src_start_x, src_start_y, z
+        )
 
         img_box = bounding_box.BoundingBox(
             start=(src_start_x, src_start_y, 0),
@@ -163,6 +160,12 @@ async def warp_section(
     )
 
     return result
+
+
+async def load_data(section_data, src_end_x, src_end_y, src_start_x, src_start_y, z):
+    src_data = section_data[z : z + 1, src_start_y:src_end_y, src_start_x:src_end_x]
+    src_data = src_data[np.newaxis]
+    return src_data
 
 
 @task(
