@@ -330,7 +330,7 @@ def submit_flows(
     last_inv_map_zarr_dict: dict,
     stride: float,
 ):
-    n_sections_per_job = 25
+    n_sections_per_job = 10
     warped_sections = []
     for i, z in enumerate(range(start_section, end_section, n_sections_per_job)):
 
