@@ -1,9 +1,8 @@
-import asyncio
 import gc
 import os
-from asyncio import Semaphore
-from datetime import datetime
+import threading
 from pathlib import Path
+from threading import Semaphore
 from typing import Any, Optional
 
 import numpy as np
@@ -58,7 +57,7 @@ def exlude_semaphore_task_input_hash(
 ) -> Optional[str]:
     hash_args = {}
     for k, item in arguments.items():
-        if not isinstance(item, asyncio.Semaphore):
+        if not isinstance(item, threading.Semaphore):
             hash_args[k] = item
 
     return task_input_hash(context, hash_args)
@@ -105,51 +104,53 @@ async def warp_section(
         yx_start[1] + out_vol.shape[2],
     )
 
-    await memory_lock.acquire()
-    cur = datetime.now()
-    src_data = await load_data(
-        section_data, src_end_x, src_end_y, src_start_x, src_start_y, z
-    )
-    load_time = datetime.now()
+    try:
+        memory_lock.acquire()
+        src_data = await load_data(
+            section_data, src_end_x, src_end_y, src_start_x, src_start_y, z
+        )
 
-    img_box = bounding_box.BoundingBox(
-        start=(src_start_x, src_start_y, 0),
-        size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
-    )
+        img_box = bounding_box.BoundingBox(
+            start=(src_start_x, src_start_y, 0),
+            size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
+        )
 
-    end_y = min(min(y + tile_size, y + yx_size[0]), yx_start[0] + out_vol.shape[1])
-    end_x = min(min(x + tile_size, x + yx_size[1]), yx_start[1] + out_vol.shape[2])
-    out_box = bounding_box.BoundingBox(start=(x, y, 0), size=(end_x - x, end_y - y, 1))
+        end_y = min(min(y + tile_size, y + yx_size[0]), yx_start[0] + out_vol.shape[1])
+        end_x = min(min(x + tile_size, x + yx_size[1]), yx_start[1] + out_vol.shape[2])
+        out_box = bounding_box.BoundingBox(
+            start=(x, y, 0), size=(end_x - x, end_y - y, 1)
+        )
 
-    out_start_y = min(y, y - yx_start[0])
-    out_start_x = min(x, x - yx_start[1])
-    out_end_y = min(end_y, end_y - yx_start[0])
-    out_end_x = min(end_x, end_x - yx_start[1])
-    logger = get_run_logger()
-    logger.debug(f"y = {y}, x = {x}")
-    logger.debug(f"img_box = {img_box}")
-    logger.debug(f"out_box = {out_box}")
-    logger.debug(f"out_start_y = {out_start_y}, out_end_y = {out_end_y}")
-    logger.debug(f"out_start_x = {out_start_x}, out_end_x = {out_end_x}")
-    out_vol[
-        z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
-    ] = warp.warp_subvolume(
-        src_data,
-        image_box=img_box,
-        coord_map=inv_map,
-        map_box=box,
-        stride=stride,
-        out_box=out_box,
-        interpolation="lanczos",
-        parallelism=1,
-    )[
-        0, 0
-    ]
-    warp_and_save = datetime.now()
-    logger.warning(f"Load time: {load_time - cur}")
-    logger.warning(f"Warp & Save time: {warp_and_save - load_time}")
-    gc.collect()
-    memory_lock.release()
+        out_start_y = min(y, y - yx_start[0])
+        out_start_x = min(x, x - yx_start[1])
+        out_end_y = min(end_y, end_y - yx_start[0])
+        out_end_x = min(end_x, end_x - yx_start[1])
+        logger = get_run_logger()
+        logger.debug(f"y = {y}, x = {x}")
+        logger.debug(f"img_box = {img_box}")
+        logger.debug(f"out_box = {out_box}")
+        logger.debug(f"out_start_y = {out_start_y}, out_end_y = {out_end_y}")
+        logger.debug(f"out_start_x = {out_start_x}, out_end_x = {out_end_x}")
+        out_vol[
+            z - z_offset, out_start_y:out_end_y, out_start_x:out_end_x
+        ] = warp.warp_subvolume(
+            src_data,
+            image_box=img_box,
+            coord_map=inv_map,
+            map_box=box,
+            stride=stride,
+            out_box=out_box,
+            interpolation="lanczos",
+            parallelism=1,
+        )[
+            0, 0
+        ]
+
+        gc.collect()
+    except Exception as e:
+        raise e
+    finally:
+        memory_lock.release()
 
     result = ZarrSource.from_path(
         path=target_zarr.get_path(),
