@@ -1,8 +1,9 @@
+import asyncio
 import gc
 import os
-import threading
+from asyncio import Semaphore
+from datetime import datetime
 from pathlib import Path
-from threading import Semaphore
 from typing import Any, Optional
 
 import numpy as np
@@ -57,7 +58,7 @@ def exlude_semaphore_task_input_hash(
 ) -> Optional[str]:
     hash_args = {}
     for k, item in arguments.items():
-        if not isinstance(item, threading.Semaphore):
+        if not isinstance(item, asyncio.Semaphore):
             hash_args[k] = item
 
     return task_input_hash(context, hash_args)
@@ -104,11 +105,12 @@ async def warp_section(
         yx_start[1] + out_vol.shape[2],
     )
 
-    try:
-        memory_lock.acquire()
+    async with memory_lock.acquire():
+        cur = datetime.now()
         src_data = await load_data(
             section_data, src_end_x, src_end_y, src_start_x, src_start_y, z
         )
+        load_time = datetime.now()
 
         img_box = bounding_box.BoundingBox(
             start=(src_start_x, src_start_y, 0),
@@ -145,12 +147,10 @@ async def warp_section(
         )[
             0, 0
         ]
-
+        warp_and_save = datetime.now()
+        logger.warning(f"Load time: {load_time - cur}")
+        logger.warning(f"Warp & Save time: {warp_and_save - load_time}")
         gc.collect()
-    except Exception as e:
-        raise e
-    finally:
-        memory_lock.release()
 
     result = ZarrSource.from_path(
         path=target_zarr.get_path(),
