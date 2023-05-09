@@ -2,7 +2,6 @@ import gc
 import os
 import threading
 from pathlib import Path
-from threading import Semaphore
 from typing import Any, Optional
 
 import numpy as np
@@ -79,7 +78,7 @@ async def warp_section(
     inv_map: ArrayLike,
     box: bounding_box.BoundingBox,
     stride: float,
-    memory_lock: Semaphore,
+    # memory_lock: Semaphore,
 ):
     # TODO: Compute this only once per section.
     # box = bounding_box.BoundingBox(
@@ -105,7 +104,7 @@ async def warp_section(
     )
 
     try:
-        memory_lock.acquire()
+        # memory_lock.acquire()
         src_data = await load_data(
             section_data, src_end_x, src_end_y, src_start_x, src_start_y, z
         )
@@ -149,8 +148,8 @@ async def warp_section(
         gc.collect()
     except Exception as e:
         raise e
-    finally:
-        memory_lock.release()
+    # finally:
+    # memory_lock.release()
 
     result = ZarrSource.from_path(
         path=target_zarr.get_path(),
@@ -274,7 +273,7 @@ def warp_sections(
         end_section=end_section,
     )
 
-    memory_lock = Semaphore(19)
+    # memory_lock = Semaphore(19)
     warped_sections = []
     buffer = []
     tile_size = 2744 * 2
@@ -310,7 +309,7 @@ def warp_sections(
                         inv_map=inv_map,
                         box=box,
                         stride=stride,
-                        memory_lock=memory_lock,
+                        # memory_lock=memory_lock,
                     )
                 )
 
