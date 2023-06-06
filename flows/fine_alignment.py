@@ -820,26 +820,26 @@ def parallel_flow_field_estimation(
     if run.state.is_failed():
         raise RuntimeError(run.state.message)
 
-    warp_parameters = {
-        "source_volume": coarse_volume_path,
-        "target_volume": join(result_dir, warp_config.target_volume_name),
-        "start_section": warp_config.start_section,
-        "end_section": warp_config.end_section,
-        "yx_start": warp_config.yx_start,
-        "yx_size": warp_config.yx_size,
-        "blocks": blocks,
-        "main_map_zarr_dict": main_map_zarr.serialize(),
-        "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
-        "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
-        "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
-        "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
-        "stride": flow_config.stride,
-        "parallelization": warp_config.parallelization,
-    }
+    # warp_parameters = {
+    #     "source_volume": coarse_volume_path,
+    #     "target_volume": join(result_dir, warp_config.target_volume_name),
+    #     "start_section": warp_config.start_section,
+    #     "end_section": warp_config.end_section,
+    #     "yx_start": warp_config.yx_start,
+    #     "yx_size": warp_config.yx_size,
+    #     "blocks": blocks,
+    #     "main_map_zarr_dict": main_map_zarr.serialize(),
+    #     "main_inv_map_zarr_dict": main_inv_map_zarr.serialize(),
+    #     "cross_block_map_zarr_dict": cross_block_map_zarr.serialize(),
+    #     "cross_block_inv_map_zarr_dict": cross_block_inv_map_zarr.serialize(),
+    #     "last_inv_map_zarr_dict": last_inv_map_zarr.serialize(),
+    #     "stride": flow_config.stride,
+    #     "parallelization": warp_config.parallelization,
+    # }
 
-    warped_sections = start_warping(
-        parameters=warp_parameters,
-    )
+    # warped_sections = start_warping(
+    #     parameters=warp_parameters,
+    # )
 
     write_alignment_info(
         path=join(result_dir, warp_config.target_volume_name, "summary.md"),
@@ -853,7 +853,7 @@ def parallel_flow_field_estimation(
         context=get_run_context(),
     )
 
-    return warped_sections
+    # return warped_sections
 
 
 if __name__ == "__main__":
