@@ -11,7 +11,6 @@ from sbem.experiment import Experiment
 from sbem.record.Section import Section
 from sbem.storage.Volume import Volume
 from sbem.tile_stitching.sofima_utils import render_tiles
-from utils.env import save_conda_env
 from utils.system import save_system_information
 
 from flows.flow_parameter_types.ExperimentConfig import ExperimentConfig
@@ -269,9 +268,10 @@ def warp_sections_flow(
 
     assert exists(exp.get_sample(exp_config.sample_name).get_aligned_data())
 
-    save_env = save_conda_env.submit(
-        output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
-    )
+    # TODO: Change to micromamba setup
+    # save_env = save_conda_env.submit(
+    #     output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
+    # )
 
     save_sys = save_system_information.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -352,5 +352,5 @@ def warp_sections_flow(
 
     commit_changes.submit(
         exp=exp,
-        wait_for=[exp, save_env, save_sys, run_context],
+        wait_for=[exp, save_sys, run_context],
     )
