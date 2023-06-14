@@ -17,6 +17,11 @@ from utils.system import save_system_information
 from flows.flow_parameter_types.ExperimentConfig import ExperimentConfig
 from flows.flow_parameter_types.WarpConfig import WarpConfig
 
+try:
+    from cvx2 import latest as cvx2
+except ImportError:
+    import cv2 as cvx2  # pytype:disable=import-error
+
 
 @task(cache_result_in_memory=False)
 def load_experiment(path: str):
@@ -255,6 +260,7 @@ def warp_sections_flow(
     exp_config: ExperimentConfig = ExperimentConfig(),
     warp_config: WarpConfig = WarpConfig(),
 ):
+    cvx2.setNumThreads(1)
     params = {
         "exp_config": exp_config.dict(),
         "warp_config": warp_config.dict(),
