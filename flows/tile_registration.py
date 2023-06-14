@@ -101,7 +101,7 @@ def commit_changes(exp: Experiment):
         cluster_class="dask_jobqueue.SLURMCluster",
         cluster_kwargs={
             "account": "dlthings",
-            "queue": "gpu_long",
+            "queue": "main",
             "cores": 4,
             "processes": 1,
             "memory": "12 GB",
@@ -123,7 +123,7 @@ def commit_changes(exp: Experiment):
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 32,
+            "maximum": 12,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
