@@ -8,7 +8,6 @@ from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 from sbem.experiment.Experiment import Experiment
 from sbem.experiment.parse_utils import parse_and_add_sections
-from utils.env import save_conda_env
 from utils.system import save_system_information
 
 
@@ -128,9 +127,10 @@ def add_sections_to_sample_flow(
         tile_overlap=tile_overlap,
     )
 
-    save_env = save_conda_env.submit(
-        output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
-    )
+    # TODO: Move to micromamba setup.
+    # save_env = save_conda_env.submit(
+    #     output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
+    # )
 
     save_sys = save_system_information.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -143,7 +143,7 @@ def add_sections_to_sample_flow(
     commit_changes.submit(
         exp=exp,
         name=sample_name,
-        wait_for=[exp, as_task, save_env, save_sys, run_context],
+        wait_for=[exp, as_task, save_sys, run_context],
     )
 
 

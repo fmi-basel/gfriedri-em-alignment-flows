@@ -12,7 +12,6 @@ from prefect_dask import DaskTaskRunner
 from sbem.experiment.Experiment import Experiment
 from sbem.record.Author import Author
 from sbem.record.Citation import Citation
-from utils.env import save_conda_env
 from utils.system import save_system_information
 
 
@@ -97,9 +96,10 @@ def create_experiment_flow(
         name=name, description=description, root_dir=root_dir
     ).result()
 
-    save_env = save_conda_env.submit(
-        output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
-    )
+    # TODO: Move to micromamba setup.
+    # save_env = save_conda_env.submit(
+    #     output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
+    # )
 
     save_sys = save_system_information.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -109,7 +109,7 @@ def create_experiment_flow(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing"), params=params
     )
 
-    commit_changes.submit(exp=exp, wait_for=[exp, save_env, save_sys, run_context])
+    commit_changes.submit(exp=exp, wait_for=[exp, save_sys, run_context])
 
 
 if __name__ == "__main__":

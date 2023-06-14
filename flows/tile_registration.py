@@ -6,7 +6,6 @@ import git
 from prefect import flow, get_run_logger, task, unmapped
 from prefect_dask import DaskTaskRunner
 from sbem.experiment.Experiment import Experiment
-from utils.env import save_conda_env
 from utils.system import save_system_information
 
 from flows.flow_parameter_types.ExperimentConfig import ExperimentConfig
@@ -142,9 +141,10 @@ def tile_registration_flow(
     logger = get_run_logger()
     exp = load_experiment.submit(path=exp_config.exp_path).result()
 
-    save_env = save_conda_env.submit(
-        output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
-    )
+    # TODO: Move to micromamba setup.
+    # save_env = save_conda_env.submit(
+    #     output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
+    # )
 
     save_sys = save_system_information.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -207,5 +207,5 @@ def tile_registration_flow(
 
     commit_changes.submit(
         exp=exp,
-        wait_for=[exp, save_env, save_sys, run_context],
+        wait_for=[exp, save_sys, run_context],
     )

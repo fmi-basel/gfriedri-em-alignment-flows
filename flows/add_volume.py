@@ -8,7 +8,6 @@ from prefect.logging.loggers import get_run_logger
 from prefect_dask import DaskTaskRunner
 from sbem.experiment import Experiment
 from sbem.storage.Volume import Volume
-from utils.env import save_conda_env
 from utils.system import save_system_information
 
 
@@ -116,9 +115,10 @@ def add_volume_flow(
         sample_name=sample_name,
     )
 
-    save_env = save_conda_env.submit(
-        output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
-    )
+    # TODO: Move to micromamba setup.
+    # save_env = save_conda_env.submit(
+    #     output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
+    # )
 
     save_sys = save_system_information.submit(
         output_dir=join(exp.get_root_dir(), exp.get_name(), "processing")
@@ -136,5 +136,5 @@ def add_volume_flow(
         exp=exp,
         volume_name=volume_name,
         name=sample_name,
-        wait_for=[exp, volume, save_env, save_sys, run_context, gitignore],
+        wait_for=[exp, volume, save_sys, run_context, gitignore],
     )
