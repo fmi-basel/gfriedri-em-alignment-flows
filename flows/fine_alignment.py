@@ -2,7 +2,7 @@ import gc
 import json
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from os.path import join
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -23,7 +23,7 @@ from numpy._typing import ArrayLike
 from ome_zarr.io import parse_url
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
-from prefect.context import FlowRunContext, TaskRunContext, get_run_context
+from prefect.context import FlowRunContext, TaskRunContext
 from prefect.deployments import run_deployment
 from prefect.filesystems import LocalFileSystem
 from pydantic import BaseModel
@@ -539,7 +539,11 @@ def write_alignment_info(
         f.write(content)
 
 
-@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
+@task(
+    cache_key_fn=task_input_hash,
+    result_storage_key=RESULT_STORAGE_KEY,
+    cache_expiration=timedelta(days=7),
+)
 def start_block_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
         name="Optimize block mesh/default",
@@ -705,60 +709,66 @@ def parallel_flow_field_estimation(
     map_zarr: zarr.Group = zarr.group(store=store)
 
     shape = final_flows[0].get_data().shape[2:]
-    map_zarr.create_dataset(
-        name="main",
-        shape=(2, len(final_flows) + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
-    map_zarr.create_dataset(
-        name="main_inv",
-        shape=(2, len(final_flows) + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
-    map_zarr.create_dataset(
-        name="cross_block_flow",
-        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
-    map_zarr.create_dataset(
-        name="cross_block",
-        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
-    map_zarr.create_dataset(
-        name="cross_block_inv",
-        shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
-    map_zarr.create_dataset(
-        name="last_inv",
-        shape=(2, len(final_flows) + 1, *shape),
-        chunks=(2, 1, *shape),
-        dtype="<f4",
-        compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
-        fill_value=0,
-        overwrite=True,
-    )
+    if "main" not in map_zarr:
+        map_zarr.create_dataset(
+            name="main",
+            shape=(2, len(final_flows) + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
+    if "main_inv" not in map_zarr:
+        map_zarr.create_dataset(
+            name="main_inv",
+            shape=(2, len(final_flows) + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
+    if "cross_block_flow" not in map_zarr:
+        map_zarr.create_dataset(
+            name="cross_block_flow",
+            shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
+    if "cross_block" not in map_zarr:
+        map_zarr.create_dataset(
+            name="cross_block",
+            shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
+    if "cross_block_inv" not in map_zarr:
+        map_zarr.create_dataset(
+            name="cross_block_inv",
+            shape=(2, len(final_flows) // integration_config.block_size + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
+    if "last_inv" not in map_zarr:
+        map_zarr.create_dataset(
+            name="last_inv",
+            shape=(2, len(final_flows) + 1, *shape),
+            chunks=(2, 1, *shape),
+            dtype="<f4",
+            compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
+            fill_value=0,
+            overwrite=True,
+        )
     main_map_zarr = ZarrSource.from_path(
         join(result_dir, "maps.zarr"), group="main", mode="w"
     )
@@ -841,17 +851,17 @@ def parallel_flow_field_estimation(
     #     parameters=warp_parameters,
     # )
 
-    write_alignment_info(
-        path=join(result_dir, warp_config.target_volume_name, "summary.md"),
-        coarse_volume_path=coarse_volume_path,
-        start_section=start_section,
-        end_section=end_section,
-        result_dir=result_dir,
-        flow_config=flow_config,
-        integration_config=integration_config,
-        warp_config=warp_config,
-        context=get_run_context(),
-    )
+    # write_alignment_info(
+    #     path=join(result_dir, warp_config.target_volume_name, "summary.md"),
+    #     coarse_volume_path=coarse_volume_path,
+    #     start_section=start_section,
+    #     end_section=end_section,
+    #     result_dir=result_dir,
+    #     flow_config=flow_config,
+    #     integration_config=integration_config,
+    #     warp_config=warp_config,
+    #     context=get_run_context(),
+    # )
 
     # return warped_sections
 
