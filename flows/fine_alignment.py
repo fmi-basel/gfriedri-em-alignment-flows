@@ -332,7 +332,11 @@ def compute_final_flow(
     )
 
 
-@task(cache_key_fn=task_input_hash, result_storage_key=RESULT_STORAGE_KEY)
+@task(
+    cache_key_fn=task_input_hash,
+    result_storage_key=RESULT_STORAGE_KEY,
+    refresh_cache=True,
+)
 def run_block_mesh_optimization(
     final_flows: list[NumpyTarget],
     start_section: int,
