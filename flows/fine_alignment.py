@@ -2,7 +2,7 @@ import gc
 import json
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from os.path import join
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -546,7 +546,7 @@ def write_alignment_info(
 @task(
     cache_key_fn=task_input_hash,
     result_storage_key=RESULT_STORAGE_KEY,
-    cache_expiration=timedelta(days=7),
+    refresh_cache=True,
 )
 def start_block_mesh_optimization(parameters):
     run: FlowRun = run_deployment(
