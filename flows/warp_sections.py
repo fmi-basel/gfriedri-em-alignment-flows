@@ -228,9 +228,9 @@ def warp_and_save(
         cluster_class="dask_jobqueue.SLURMCluster",
         cluster_kwargs={
             "account": "dlthings",
-            "queue": "main",
-            "cores": 48,
-            "processes": 1,
+            "queue": "several",
+            "cores": 24,
+            "processes": 24,
             "memory": "48 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
