@@ -229,9 +229,9 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
-            "cores": 24,
-            "processes": 24,
-            "memory": "48 GB",
+            "cores": 1,
+            "processes": 1,
+            "memory": "2 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
                 "--ntasks=1",
@@ -249,7 +249,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 1,
+            "maximum": 10,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
