@@ -248,7 +248,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 10,
+            "maximum": 12,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
