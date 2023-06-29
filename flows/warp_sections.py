@@ -231,7 +231,7 @@ def warp_and_save(
             "queue": "several",
             "cores": 1,
             "processes": 1,
-            "memory": "2 GB",
+            "memory": "5 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
                 "--ntasks=1",
