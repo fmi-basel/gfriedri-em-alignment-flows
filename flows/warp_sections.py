@@ -4,7 +4,6 @@ from typing import Dict
 
 import git
 import numpy as np
-import prefect
 from prefect import flow, get_run_logger, task
 from prefect_dask import DaskTaskRunner
 from sbem.experiment import Experiment
@@ -290,6 +289,7 @@ def warp_sections_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
+    stitched_sections = []
     for section in section_dicts:
         volume = Volume.load(exp.get_sample(exp_config.sample_name).get_aligned_data())
         if len(volume._section_list) > 0:
@@ -313,41 +313,27 @@ def warp_sections_flow(
             }
         else:
             zeroth_section_dict = None
-        try:
-            stitched = warp_and_save.submit(
-                section_dict=section,
-                zeroth_section_dict=zeroth_section_dict,
-                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
-                stride=warp_config.stride,
-                margin=warp_config.margin,
-                use_clahe=warp_config.use_clahe,
-                clahe_kwargs={
-                    "kernel_size": warp_config.kernel_size,
-                    "clip_limit": warp_config.clip_limit,
-                    "nbins": warp_config.nbins,
-                },
-                warp_parallelism=warp_config.warp_parallelism,
-            ).result()
-        except prefect.exceptions.CrashedRun:
-            # Re-submit if slurm node changes.
-            stitched = warp_and_save.submit(
-                section_dict=section,
-                zeroth_section_dict=zeroth_section_dict,
-                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
-                stride=warp_config.stride,
-                margin=warp_config.margin,
-                use_clahe=warp_config.use_clahe,
-                clahe_kwargs={
-                    "kernel_size": warp_config.kernel_size,
-                    "clip_limit": warp_config.clip_limit,
-                    "nbins": warp_config.nbins,
-                },
-                warp_parallelism=warp_config.warp_parallelism,
-            ).result()
 
+        stitched = warp_and_save.submit(
+            section_dict=section,
+            zeroth_section_dict=zeroth_section_dict,
+            volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
+            stride=warp_config.stride,
+            margin=warp_config.margin,
+            use_clahe=warp_config.use_clahe,
+            clahe_kwargs={
+                "kernel_size": warp_config.kernel_size,
+                "clip_limit": warp_config.clip_limit,
+                "nbins": warp_config.nbins,
+            },
+            warp_parallelism=warp_config.warp_parallelism,
+        )
+        stitched_sections.append(stitched)
+
+    for section, future in zip(section_dicts, stitched_sections):
         exp.get_sample(exp_config.sample_name).get_section(
             section["name"]
-        )._stitched = stitched
+        )._stitched = future.result()
         exp.save(overwrite=True)
 
     commit_changes.submit(
