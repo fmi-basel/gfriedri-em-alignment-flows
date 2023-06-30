@@ -229,6 +229,7 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
+            "job_cpu": 5,
             "cores": 5,
             "processes": 1,
             "memory": "10 GB",
