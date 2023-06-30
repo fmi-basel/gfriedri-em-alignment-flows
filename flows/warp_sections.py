@@ -228,9 +228,9 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
-            "cores": 10,
+            "cores": 5,
             "processes": 1,
-            "memory": "5 GB",
+            "memory": "25 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
                 "--ntasks=1",
@@ -325,7 +325,7 @@ def warp_sections_flow(
                 "clip_limit": warp_config.clip_limit,
                 "nbins": warp_config.nbins,
             },
-            warp_parallelism=10,
+            warp_parallelism=5,
         ).result()
         exp.get_sample(exp_config.sample_name).get_section(
             section["name"]
