@@ -228,7 +228,7 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
-            "cores": 1,
+            "cores": 10,
             "processes": 1,
             "memory": "5 GB",
             "walltime": "24:00:00",
@@ -248,7 +248,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 12,
+            "maximum": 1,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
@@ -289,7 +289,6 @@ def warp_sections_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
-    stitched_sections = []
     for section in section_dicts:
         volume = Volume.load(exp.get_sample(exp_config.sample_name).get_aligned_data())
         if len(volume._section_list) > 0:
@@ -326,14 +325,11 @@ def warp_sections_flow(
                 "clip_limit": warp_config.clip_limit,
                 "nbins": warp_config.nbins,
             },
-            warp_parallelism=warp_config.warp_parallelism,
-        )
-        stitched_sections.append(stitched)
-
-    for section, future in zip(section_dicts, stitched_sections):
+            warp_parallelism=10,
+        ).result()
         exp.get_sample(exp_config.sample_name).get_section(
             section["name"]
-        )._stitched = future.result()
+        )._stitched = stitched
         exp.save(overwrite=True)
 
     commit_changes.submit(
