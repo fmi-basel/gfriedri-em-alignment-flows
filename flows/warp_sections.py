@@ -2,6 +2,7 @@ import json
 from os.path import exists, join
 from typing import Dict
 
+import dask
 import git
 import numpy as np
 from prefect import flow, get_run_logger, task
@@ -150,73 +151,74 @@ def warp_and_save(
     clahe_kwargs: Dict,
     warp_parallelism: int,
 ):
-    logger = get_run_logger()
-    path = section_dict.pop("path")
-    section = Section.lazy_loading(**section_dict)
-    section_dict["path"] = path
-    section_path = join(path, section.get_name(), "section.yaml")
-    if not section.is_stitched():
-        section.load_from_yaml(section_path)
-        if not exists(
-            join(
-                path,
-                section.get_name(),
-                "meshes.npz",
-            )
-        ):
-            logger.info("Mesh not found. Please run tile-registration first.")
-            return False
-
-        logger.info(f"Warp section {section.get_name()}.")
-        warped_tiles, mask = render_tiles(
-            section=section,
-            section_dir=join(path, section.get_name()),
-            stride=stride,
-            margin=margin,
-            parallelism=warp_parallelism,
-            use_clahe=use_clahe,
-            clahe_kwargs=clahe_kwargs,
-        )
-
-        if warped_tiles is not None:
-            volume = Volume.load(volume_path)
-            if len(volume._section_list) == 0:
-                logger.info("First section insert at [0, 0, 0].")
-                volume.write_section(
-                    section_num=section.get_section_num(),
-                    data=warped_tiles[np.newaxis],
-                    offsets=tuple([0, 0, 0]),
+    with dask.annotate(resources={"process": 1}):
+        logger = get_run_logger()
+        path = section_dict.pop("path")
+        section = Section.lazy_loading(**section_dict)
+        section_dict["path"] = path
+        section_path = join(path, section.get_name(), "section.yaml")
+        if not section.is_stitched():
+            section.load_from_yaml(section_path)
+            if not exists(
+                join(
+                    path,
+                    section.get_name(),
+                    "meshes.npz",
                 )
-            else:
-                # zs_path = zeroth_section_dict.pop("path")
-                # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
-                # zeroth_section_path = join(
-                #     zs_path, zeroth_section.get_name(), "section.yaml"
-                # )
-                # zeroth_section.load_from_yaml(zeroth_section_path)
+            ):
+                logger.info("Mesh not found. Please run tile-registration first.")
+                return False
 
-                # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
-                # current_section_stage_coords = get_section_stage_coords(section)
-
-                # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
-
-                z_index = get_volume_z_pos(volume, section)
-                # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
-
-                # logger.info(f"Insert section at {offset}.")
-
-                volume.write_section(
-                    section_num=section.get_section_num(),
-                    data=warped_tiles[np.newaxis],
-                    offsets=tuple([z_index, 0, 0]),
-                )
-
-            logger.info(
-                f"Section {section.get_name()} successfully stitched and saved."
+            logger.info(f"Warp section {section.get_name()}.")
+            warped_tiles, mask = render_tiles(
+                section=section,
+                section_dir=join(path, section.get_name()),
+                stride=stride,
+                margin=margin,
+                parallelism=warp_parallelism,
+                use_clahe=use_clahe,
+                clahe_kwargs=clahe_kwargs,
             )
-            section._stitched = True
-            volume.save()
-            return True
+
+            if warped_tiles is not None:
+                volume = Volume.load(volume_path)
+                if len(volume._section_list) == 0:
+                    logger.info("First section insert at [0, 0, 0].")
+                    volume.write_section(
+                        section_num=section.get_section_num(),
+                        data=warped_tiles[np.newaxis],
+                        offsets=tuple([0, 0, 0]),
+                    )
+                else:
+                    # zs_path = zeroth_section_dict.pop("path")
+                    # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
+                    # zeroth_section_path = join(
+                    #     zs_path, zeroth_section.get_name(), "section.yaml"
+                    # )
+                    # zeroth_section.load_from_yaml(zeroth_section_path)
+
+                    # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
+                    # current_section_stage_coords = get_section_stage_coords(section)
+
+                    # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
+
+                    z_index = get_volume_z_pos(volume, section)
+                    # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
+
+                    # logger.info(f"Insert section at {offset}.")
+
+                    volume.write_section(
+                        section_num=section.get_section_num(),
+                        data=warped_tiles[np.newaxis],
+                        offsets=tuple([z_index, 0, 0]),
+                    )
+
+                logger.info(
+                    f"Section {section.get_name()} successfully stitched and saved."
+                )
+                section._stitched = True
+                volume.save()
+                return True
 
     return False
 
@@ -237,10 +239,9 @@ def warp_and_save(
                 "--output=/tungstenfs/scratch/gmicro_share/_prefect/slurm/gfriedri-em-alignment-flows/output/%j.out",
             ],
             "worker_extra_args": [
-                "--lifetime",
-                "1440m",
-                "--lifetime-stagger",
-                "10m",
+                "--lifetime 1440m",
+                "--lifetime-stagger 10m",
+                "--resources process=1",
             ],
             "job_script_prologue": [
                 "conda run -p /tungstenfs/scratch/gmicro_share/_prefect/miniconda3/envs/airtable python /tungstenfs/scratch/gmicro_share/_prefect/airtable/log-slurm-job.py --config /tungstenfs/scratch/gmicro/_prefect/airtable/slurm-job-log.ini"
