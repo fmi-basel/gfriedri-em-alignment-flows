@@ -151,74 +151,73 @@ def warp_and_save(
     clahe_kwargs: Dict,
     warp_parallelism: int,
 ):
-    with dask.annotate(resources={"process": 1}):
-        logger = get_run_logger()
-        path = section_dict.pop("path")
-        section = Section.lazy_loading(**section_dict)
-        section_dict["path"] = path
-        section_path = join(path, section.get_name(), "section.yaml")
-        if not section.is_stitched():
-            section.load_from_yaml(section_path)
-            if not exists(
-                join(
-                    path,
-                    section.get_name(),
-                    "meshes.npz",
-                )
-            ):
-                logger.info("Mesh not found. Please run tile-registration first.")
-                return False
-
-            logger.info(f"Warp section {section.get_name()}.")
-            warped_tiles, mask = render_tiles(
-                section=section,
-                section_dir=join(path, section.get_name()),
-                stride=stride,
-                margin=margin,
-                parallelism=warp_parallelism,
-                use_clahe=use_clahe,
-                clahe_kwargs=clahe_kwargs,
+    logger = get_run_logger()
+    path = section_dict.pop("path")
+    section = Section.lazy_loading(**section_dict)
+    section_dict["path"] = path
+    section_path = join(path, section.get_name(), "section.yaml")
+    if not section.is_stitched():
+        section.load_from_yaml(section_path)
+        if not exists(
+            join(
+                path,
+                section.get_name(),
+                "meshes.npz",
             )
+        ):
+            logger.info("Mesh not found. Please run tile-registration first.")
+            return False
 
-            if warped_tiles is not None:
-                volume = Volume.load(volume_path)
-                if len(volume._section_list) == 0:
-                    logger.info("First section insert at [0, 0, 0].")
-                    volume.write_section(
-                        section_num=section.get_section_num(),
-                        data=warped_tiles[np.newaxis],
-                        offsets=tuple([0, 0, 0]),
-                    )
-                else:
-                    # zs_path = zeroth_section_dict.pop("path")
-                    # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
-                    # zeroth_section_path = join(
-                    #     zs_path, zeroth_section.get_name(), "section.yaml"
-                    # )
-                    # zeroth_section.load_from_yaml(zeroth_section_path)
+        logger.info(f"Warp section {section.get_name()}.")
+        warped_tiles, mask = render_tiles(
+            section=section,
+            section_dir=join(path, section.get_name()),
+            stride=stride,
+            margin=margin,
+            parallelism=warp_parallelism,
+            use_clahe=use_clahe,
+            clahe_kwargs=clahe_kwargs,
+        )
 
-                    # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
-                    # current_section_stage_coords = get_section_stage_coords(section)
-
-                    # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
-
-                    z_index = get_volume_z_pos(volume, section)
-                    # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
-
-                    # logger.info(f"Insert section at {offset}.")
-
-                    volume.write_section(
-                        section_num=section.get_section_num(),
-                        data=warped_tiles[np.newaxis],
-                        offsets=tuple([z_index, 0, 0]),
-                    )
-
-                logger.info(
-                    f"Section {section.get_name()} successfully stitched and saved."
+        if warped_tiles is not None:
+            volume = Volume.load(volume_path)
+            if len(volume._section_list) == 0:
+                logger.info("First section insert at [0, 0, 0].")
+                volume.write_section(
+                    section_num=section.get_section_num(),
+                    data=warped_tiles[np.newaxis],
+                    offsets=tuple([0, 0, 0]),
                 )
-                section._stitched = True
-                volume.save()
-                return True
+            else:
+                # zs_path = zeroth_section_dict.pop("path")
+                # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
+                # zeroth_section_path = join(
+                #     zs_path, zeroth_section.get_name(), "section.yaml"
+                # )
+                # zeroth_section.load_from_yaml(zeroth_section_path)
+
+                # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
+                # current_section_stage_coords = get_section_stage_coords(section)
+
+                # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
+
+                z_index = get_volume_z_pos(volume, section)
+                # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
+
+                # logger.info(f"Insert section at {offset}.")
+
+                volume.write_section(
+                    section_num=section.get_section_num(),
+                    data=warped_tiles[np.newaxis],
+                    offsets=tuple([z_index, 0, 0]),
+                )
+
+            logger.info(
+                f"Section {section.get_name()} successfully stitched and saved."
+            )
+            section._stitched = True
+            volume.save()
+            return True
 
     return False
 
@@ -291,25 +290,27 @@ def warp_sections_flow(
     ).result()
 
     futures = []
-    for section in section_dicts:
-
-        futures.append(
-            warp_and_save.submit(
-                section_dict=section,
-                # zeroth_section_dict=zeroth_section_dict,
-                zeroth_section_dict=None,
-                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
-                stride=warp_config.stride,
-                margin=warp_config.margin,
-                use_clahe=warp_config.use_clahe,
-                clahe_kwargs={
-                    "kernel_size": warp_config.kernel_size,
-                    "clip_limit": warp_config.clip_limit,
-                    "nbins": warp_config.nbins,
-                },
-                warp_parallelism=5,
+    with dask.annotate(resources={"process": 5}):
+        for section in section_dicts:
+            futures.append(
+                warp_and_save.submit(
+                    section_dict=section,
+                    # zeroth_section_dict=zeroth_section_dict,
+                    zeroth_section_dict=None,
+                    volume_path=exp.get_sample(
+                        exp_config.sample_name
+                    ).get_aligned_data(),
+                    stride=warp_config.stride,
+                    margin=warp_config.margin,
+                    use_clahe=warp_config.use_clahe,
+                    clahe_kwargs={
+                        "kernel_size": warp_config.kernel_size,
+                        "clip_limit": warp_config.clip_limit,
+                        "nbins": warp_config.nbins,
+                    },
+                    warp_parallelism=5,
+                )
             )
-        )
 
     for section, fut in zip(section_dicts, futures):
         exp.get_sample(exp_config.sample_name).get_section(
