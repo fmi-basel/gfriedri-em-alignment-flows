@@ -230,9 +230,9 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
-            "cores": 1,
+            "cores": 5,
             "processes": 1,
-            "memory": "5 GB",
+            "memory": "10 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
                 "--ntasks=1",
@@ -249,7 +249,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 12,
+            "maximum": 1,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
@@ -290,34 +290,28 @@ def warp_sections_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
-    futures = []
     with dask.annotate(resources={"TEST": 1}):  # This does not work.
         for i, section in enumerate(section_dicts):
-            futures.append(
-                warp_and_save.submit(
-                    section_dict=section,
-                    # zeroth_section_dict=zeroth_section_dict,
-                    z_index=i,
-                    volume_path=exp.get_sample(
-                        exp_config.sample_name
-                    ).get_aligned_data(),
-                    stride=warp_config.stride,
-                    margin=warp_config.margin,
-                    use_clahe=warp_config.use_clahe,
-                    clahe_kwargs={
-                        "kernel_size": warp_config.kernel_size,
-                        "clip_limit": warp_config.clip_limit,
-                        "nbins": warp_config.nbins,
-                    },
-                    warp_parallelism=1,
-                )
-            )
+            stitched = warp_and_save.submit(
+                section_dict=section,
+                # zeroth_section_dict=zeroth_section_dict,
+                z_index=i,
+                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
+                stride=warp_config.stride,
+                margin=warp_config.margin,
+                use_clahe=warp_config.use_clahe,
+                clahe_kwargs={
+                    "kernel_size": warp_config.kernel_size,
+                    "clip_limit": warp_config.clip_limit,
+                    "nbins": warp_config.nbins,
+                },
+                warp_parallelism=5,
+            ).result()
 
-    for section, fut in zip(section_dicts, futures):
-        exp.get_sample(exp_config.sample_name).get_section(
-            section["name"]
-        )._stitched = fut.result()
-        exp.save(overwrite=True)
+            exp.get_sample(exp_config.sample_name).get_section(
+                section["name"]
+            )._stitched = stitched
+            exp.save(overwrite=True)
 
     commit_changes.submit(
         exp=exp,
