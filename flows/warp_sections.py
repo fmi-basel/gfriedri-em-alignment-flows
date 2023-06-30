@@ -239,8 +239,8 @@ def warp_and_save(
                 "--output=/tungstenfs/scratch/gmicro_share/_prefect/slurm/gfriedri-em-alignment-flows/output/%j.out",
             ],
             "worker_extra_args": [
-                "--lifetime 1440m",
-                "--lifetime-stagger 10m",
+                # "--lifetime 1440m",
+                # "--lifetime-stagger 10m",
                 "--resources process=1",
             ],
             "job_script_prologue": [
