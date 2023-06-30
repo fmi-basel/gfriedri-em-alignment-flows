@@ -188,22 +188,22 @@ def warp_and_save(
                     offsets=tuple([0, 0, 0]),
                 )
             else:
-                zs_path = zeroth_section_dict.pop("path")
-                zeroth_section = Section.lazy_loading(**zeroth_section_dict)
-                zeroth_section_path = join(
-                    zs_path, zeroth_section.get_name(), "section.yaml"
-                )
-                zeroth_section.load_from_yaml(zeroth_section_path)
+                # zs_path = zeroth_section_dict.pop("path")
+                # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
+                # zeroth_section_path = join(
+                #     zs_path, zeroth_section.get_name(), "section.yaml"
+                # )
+                # zeroth_section.load_from_yaml(zeroth_section_path)
 
-                zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
-                current_section_stage_coords = get_section_stage_coords(section)
+                # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
+                # current_section_stage_coords = get_section_stage_coords(section)
 
-                offset_yx = current_section_stage_coords - zeroth_section_stage_coords
+                # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
 
                 z_index = get_volume_z_pos(volume, section)
-                offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
+                # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
 
-                logger.info(f"Insert section at {offset}.")
+                # logger.info(f"Insert section at {offset}.")
 
                 volume.write_section(
                     section_num=section.get_section_num(),
@@ -248,7 +248,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 1,
+            "maximum": 5,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
@@ -289,47 +289,31 @@ def warp_sections_flow(
         end_section_num=exp_config.end_section_num,
     ).result()
 
+    futures = []
     for section in section_dicts:
-        volume = Volume.load(exp.get_sample(exp_config.sample_name).get_aligned_data())
-        if len(volume._section_list) > 0:
-            zeroth_section_num = volume._section_list[0]
-            zeroth_section = exp.get_sample(exp_config.sample_name).get_section(
-                f"s{zeroth_section_num}_" f"g{exp_config.tile_grid_num}"
-            )
-            zeroth_section_dict = {
-                "name": zeroth_section.get_name(),
-                "stitched": zeroth_section.is_stitched(),
-                "skip": zeroth_section.skip(),
-                "acquisition": zeroth_section.get_acquisition(),
-                "section_num": zeroth_section.get_section_num(),
-                "tile_grid_num": zeroth_section.get_tile_grid_num(),
-                "details": "",
-                "path": join(
-                    zeroth_section.get_sample().get_experiment().get_root_dir(),
-                    zeroth_section.get_sample().get_experiment().get_name(),
-                    zeroth_section.get_sample().get_name(),
-                ),
-            }
-        else:
-            zeroth_section_dict = None
 
-        stitched = warp_and_save.submit(
-            section_dict=section,
-            zeroth_section_dict=zeroth_section_dict,
-            volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
-            stride=warp_config.stride,
-            margin=warp_config.margin,
-            use_clahe=warp_config.use_clahe,
-            clahe_kwargs={
-                "kernel_size": warp_config.kernel_size,
-                "clip_limit": warp_config.clip_limit,
-                "nbins": warp_config.nbins,
-            },
-            warp_parallelism=5,
-        ).result()
+        futures.append(
+            warp_and_save.submit(
+                section_dict=section,
+                # zeroth_section_dict=zeroth_section_dict,
+                zeroth_section_dict=None,
+                volume_path=exp.get_sample(exp_config.sample_name).get_aligned_data(),
+                stride=warp_config.stride,
+                margin=warp_config.margin,
+                use_clahe=warp_config.use_clahe,
+                clahe_kwargs={
+                    "kernel_size": warp_config.kernel_size,
+                    "clip_limit": warp_config.clip_limit,
+                    "nbins": warp_config.nbins,
+                },
+                warp_parallelism=5,
+            )
+        )
+
+    for section, fut in zip(section_dicts, futures):
         exp.get_sample(exp_config.sample_name).get_section(
             section["name"]
-        )._stitched = stitched
+        )._stitched = fut.result()
         exp.save(overwrite=True)
 
     commit_changes.submit(
