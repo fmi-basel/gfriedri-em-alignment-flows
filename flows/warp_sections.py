@@ -143,7 +143,7 @@ def get_volume_z_pos(volume: Volume, section: Section):
 @task(cache_result_in_memory=False, retries=1, retry_delay_seconds=30)
 def warp_and_save(
     section_dict: dict,
-    zeroth_section_dict: dict,
+    z_index: int,
     volume_path: str,
     stride: int,
     margin: int,
@@ -201,7 +201,7 @@ def warp_and_save(
 
                 # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
 
-                z_index = get_volume_z_pos(volume, section)
+                # z_index = get_volume_z_pos(volume, section)
                 # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
 
                 # logger.info(f"Insert section at {offset}.")
@@ -291,12 +291,12 @@ def warp_sections_flow(
 
     futures = []
     with dask.annotate(resources={"TEST": 1}):  # This does not work.
-        for section in section_dicts:
+        for i, section in enumerate(section_dicts):
             futures.append(
                 warp_and_save.submit(
                     section_dict=section,
                     # zeroth_section_dict=zeroth_section_dict,
-                    zeroth_section_dict=None,
+                    z_index=i,
                     volume_path=exp.get_sample(
                         exp_config.sample_name
                     ).get_aligned_data(),
