@@ -240,7 +240,7 @@ def warp_and_save(
             "worker_extra_args": [
                 # "--lifetime 1440m",
                 # "--lifetime-stagger 10m",
-                "--resources process=1",
+                "--resources TEST=1",
             ],
             "job_script_prologue": [
                 "conda run -p /tungstenfs/scratch/gmicro_share/_prefect/miniconda3/envs/airtable python /tungstenfs/scratch/gmicro_share/_prefect/airtable/log-slurm-job.py --config /tungstenfs/scratch/gmicro/_prefect/airtable/slurm-job-log.ini"
@@ -290,7 +290,7 @@ def warp_sections_flow(
     ).result()
 
     futures = []
-    with dask.annotate(resources={"process": 5}):
+    with dask.annotate(resources={"TEST": 1}):
         for section in section_dicts:
             futures.append(
                 warp_and_save.submit(
