@@ -229,10 +229,9 @@ def warp_and_save(
         cluster_kwargs={
             "account": "dlthings",
             "queue": "several",
-            "job_cpu": 5,
-            "cores": 5,
+            "cores": 1,
             "processes": 1,
-            "memory": "10 GB",
+            "memory": "5 GB",
             "walltime": "24:00:00",
             "job_extra_directives": [
                 "--ntasks=1",
@@ -249,7 +248,7 @@ def warp_and_save(
         },
         adapt_kwargs={
             "minimum": 1,
-            "maximum": 5,
+            "maximum": 12,
         },
     ),
     result_storage="local-file-system/gfriedri-em-alignment-flows-storage",
@@ -291,7 +290,7 @@ def warp_sections_flow(
     ).result()
 
     futures = []
-    with dask.annotate(resources={"TEST": 1}):
+    with dask.annotate(resources={"TEST": 1}):  # This does not work.
         for section in section_dicts:
             futures.append(
                 warp_and_save.submit(
@@ -309,7 +308,7 @@ def warp_sections_flow(
                         "clip_limit": warp_config.clip_limit,
                         "nbins": warp_config.nbins,
                     },
-                    warp_parallelism=5,
+                    warp_parallelism=1,
                 )
             )
 
