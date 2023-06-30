@@ -181,36 +181,37 @@ def warp_and_save(
 
         if warped_tiles is not None:
             volume = Volume.load(volume_path)
-            if len(volume._section_list) == 0:
-                logger.info("First section insert at [0, 0, 0].")
-                volume.write_section(
-                    section_num=section.get_section_num(),
-                    data=warped_tiles[np.newaxis],
-                    offsets=tuple([0, 0, 0]),
-                )
-            else:
-                # zs_path = zeroth_section_dict.pop("path")
-                # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
-                # zeroth_section_path = join(
-                #     zs_path, zeroth_section.get_name(), "section.yaml"
-                # )
-                # zeroth_section.load_from_yaml(zeroth_section_path)
+            # if len(volume._section_list) == 0:
+            #     logger.info("First section insert at [0, 0, 0].")
+            #     volume.write_section(
+            #         section_num=section.get_section_num(),
+            #         data=warped_tiles[np.newaxis],
+            #         offsets=tuple([0, 0, 0]),
+            #     )
+            # else:
+            # zs_path = zeroth_section_dict.pop("path")
+            # zeroth_section = Section.lazy_loading(**zeroth_section_dict)
+            # zeroth_section_path = join(
+            #     zs_path, zeroth_section.get_name(), "section.yaml"
+            # )
+            # zeroth_section.load_from_yaml(zeroth_section_path)
 
-                # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
-                # current_section_stage_coords = get_section_stage_coords(section)
+            # zeroth_section_stage_coords = get_section_stage_coords(zeroth_section)
+            # current_section_stage_coords = get_section_stage_coords(section)
 
-                # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
+            # offset_yx = current_section_stage_coords - zeroth_section_stage_coords
 
-                # z_index = get_volume_z_pos(volume, section)
-                # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
+            # z_index = get_volume_z_pos(volume, section)
+            # offset = tuple([z_index, int(offset_yx[0]), int(offset_yx[1])])
 
-                # logger.info(f"Insert section at {offset}.")
+            # logger.info(f"Insert section at {offset}.")
 
-                volume.write_section(
-                    section_num=section.get_section_num(),
-                    data=warped_tiles[np.newaxis],
-                    offsets=tuple([z_index, 0, 0]),
-                )
+            logger.info(f"Write section into z-plane {z_index}.")
+            volume.write_section(
+                section_num=section.get_section_num(),
+                data=warped_tiles[np.newaxis],
+                offsets=tuple([z_index, 0, 0]),
+            )
 
             logger.info(
                 f"Section {section.get_name()} successfully stitched and saved."
