@@ -60,7 +60,7 @@ def parse_data(
 
     section_paths = []
     for section in sections.values():
-        section.save(path=output_dir, overwrite=False)
+        section.save(path=output_dir, overwrite=True)
         tile_id_map_path = join(output_dir, section.get_name(), "tile_id_map.json")
         if not exists(tile_id_map_path):
             section.get_tile_id_map(path=tile_id_map_path)
