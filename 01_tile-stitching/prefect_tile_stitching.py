@@ -3,12 +3,18 @@ from os.path import dirname, join
 from prefect import flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.task_runners import SequentialTaskRunner
 from s01_parse_data import AcquisitionConfig, parse_data
 from s02_register_tiles import MeshIntegrationConfig, RegistrationConfig, filter_ignore
 from s03_warp_tiles import WarpConfig, warp_tiles
 from sbem.record.Section import Section
 from sbem.tile_stitching.sofima_utils import register_tiles
 from sofima import mesh
+
+try:
+    from cvx2 import latest as cvx2
+except ImportError:
+    import cv2 as cvx2  # pytype:disable=import-error
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 
@@ -96,6 +102,7 @@ def register_tiles_task(
 @flow(
     name="[SOFIMA] Register Tiles",
     persist_result=True,
+    task_runner=SequentialTaskRunner(),
 )
 def register_tiles_flow(
     section_yaml_files: list[str],
@@ -106,6 +113,8 @@ def register_tiles_flow(
 
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+
+    cvx2.setNumThreads(1)
 
     section_yaml_files = filter_ignore(section_yaml_files, file_name="section.yaml")
 
@@ -141,6 +150,7 @@ def warp_tiles_task(
 @flow(
     name="[SOFIMA] Warp Tiles",
     persist_result=True,
+    task_runner=SequentialTaskRunner(),
 )
 def warp_tiles_flow(
     output_dir: str,
@@ -148,6 +158,7 @@ def warp_tiles_flow(
     stride: int,
     warp_config: WarpConfig,
 ):
+    cvx2.setNumThreads(1)
     from s02_register_tiles import filter_ignore
 
     mesh_files = filter_ignore(mesh_files, file_name="meshes.npz")
