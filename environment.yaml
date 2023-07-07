@@ -4,9 +4,9 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - jaxlib=*=*cuda*
+  - jaxlib=*=*cuda112*
   - jax
-  - nvidia::cuda-nvcc
+  - nvidia::cuda-nvcc=11.7
   - pip
   - pip:
      - psutil
