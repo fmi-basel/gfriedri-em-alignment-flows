@@ -109,11 +109,6 @@ def register_tiles_flow(
     mesh_integration_config: MeshIntegrationConfig,
     registration_config: RegistrationConfig,
 ):
-    import os
-
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-
     cvx2.setNumThreads(1)
 
     section_yaml_files = filter_ignore(section_yaml_files, file_name="section.yaml")
