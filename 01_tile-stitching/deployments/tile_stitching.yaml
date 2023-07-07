@@ -1,0 +1,343 @@
+###
+### A complete description of a Prefect Deployment for flow '[SOFIMA] Tile Stitching'
+###
+name: buchtimo
+description: null
+version: 0dae50948b62cc71607d10f4615a4a77
+# The work queue that will handle this deployment's runs
+work_queue_name: buchtimo
+work_pool_name: SLURM
+tags: []
+parameters: {}
+schedule: null
+is_schedule_active: null
+infra_overrides: {}
+
+###
+### DO NOT EDIT BELOW THIS LINE
+###
+flow_name: '[SOFIMA] Tile Stitching'
+manifest_path: null
+infrastructure:
+  type: process
+  env:
+    WF_ENV_NAME: gfriedri-em-alignment-flows
+    PREFECT_LOGGING_LEVEL: INFO
+    PREFECT_LOCAL_STORAGE_PATH: /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/result_storage
+    PREFECT_TASKS_REFRESH_CACHE: 'false'
+  labels: {}
+  name: null
+  command:
+  - /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/slurm/orchestration.sh
+  stream_output: false
+  working_dir: /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/working_dir
+  _block_document_id: 8d6375a2-bc8e-4e1f-b410-6b7073b9fd9d
+  _block_document_name: gfriedri-em-alignment-buchtimo-orchestration
+  _is_anonymous: false
+  block_type_slug: process
+  _block_type_slug: process
+storage:
+  repository: https://github.com/fmi-basel/gfriedri-em-alignment-flows
+  reference: refactor-tile-registration
+  access_token: null
+  include_git_objects: false
+  _block_document_id: 57e117c0-e230-4edc-b20e-0dc64e35f4ed
+  _block_document_name: gfriedri-em-alignment-flow-buchtimo
+  _is_anonymous: false
+  block_type_slug: github
+  _block_type_slug: github
+path: ''
+entrypoint: 01_tile-stitching/prefect_tile_stitching.py:tile_stitching
+parameter_openapi_schema:
+  title: Parameters
+  type: object
+  properties:
+    user:
+      title: user
+      position: 0
+      type: string
+    output_dir:
+      title: output_dir
+      position: 1
+      type: string
+    acquisiton_conf:
+      title: acquisiton_conf
+      default:
+        sbem_root_dir: ''
+        acquisition: run_0
+        tile_grid: g0001
+        thickness: 25
+        resolution_xy: 11
+        tile_width: 3072
+        tile_height: 2304
+        tile_overlap: 220
+      position: 2
+      allOf:
+      - $ref: '#/definitions/AcquisitionConfig'
+    mesh_integration_config:
+      title: mesh_integration_config
+      default:
+        dt: 0.001
+        gamma: 0.0
+        k0: 0.01
+        k: 0.1
+        stride: 20
+        num_iters: 1000
+        max_iters: 20000
+        stop_v_max: 0.001
+        dt_max: 100.0
+        prefer_orig_order: true
+        start_cap: 1.0
+        final_cap: 10.0
+        remove_drift: true
+      position: 3
+      allOf:
+      - $ref: '#/definitions/MeshIntegrationConfig'
+    registration_config:
+      title: registration_config
+      default:
+        overlaps_x:
+        - 200
+        - 300
+        - 400
+        overlaps_y:
+        - 200
+        - 300
+        - 400
+        min_overlap: 20
+        min_range:
+        - 10
+        - 100
+        - 0
+        patch_size:
+        - 80
+        - 80
+        batch_size: 8000
+        min_peak_ratio: 1.4
+        min_peak_sharpness: 1.4
+        max_deviation: 5
+        max_magnitude: 0
+        min_patch_size: 10
+        max_gradient: -1.0
+        reconcile_flow_max_deviation: -1.0
+      position: 4
+      allOf:
+      - $ref: '#/definitions/RegistrationConfig'
+    warp_config:
+      title: warp_config
+      default:
+        margin: 20
+        use_clahe: true
+        kernel_size: 1024
+        clip_limit: 0.01
+        nbins: 256
+        warp_parallelism: 5
+      position: 5
+      allOf:
+      - $ref: '#/definitions/WarpConfig'
+    max_parallel_jobs:
+      title: max_parallel_jobs
+      default: 10
+      position: 6
+      type: integer
+  required:
+  - user
+  - output_dir
+  definitions:
+    AcquisitionConfig:
+      title: AcquisitionConfig
+      type: object
+      properties:
+        sbem_root_dir:
+          title: Sbem Root Dir
+          default: ''
+          type: string
+        acquisition:
+          title: Acquisition
+          default: run_0
+          type: string
+        tile_grid:
+          title: Tile Grid
+          default: g0001
+          type: string
+        thickness:
+          title: Thickness
+          default: 25
+          type: number
+        resolution_xy:
+          title: Resolution Xy
+          default: 11
+          type: number
+        tile_width:
+          title: Tile Width
+          default: 3072
+          type: integer
+        tile_height:
+          title: Tile Height
+          default: 2304
+          type: integer
+        tile_overlap:
+          title: Tile Overlap
+          default: 220
+          type: integer
+    MeshIntegrationConfig:
+      title: MeshIntegrationConfig
+      type: object
+      properties:
+        dt:
+          title: Dt
+          default: 0.001
+          type: number
+        gamma:
+          title: Gamma
+          default: 0.0
+          type: number
+        k0:
+          title: K0
+          default: 0.01
+          type: number
+        k:
+          title: K
+          default: 0.1
+          type: number
+        stride:
+          title: Stride
+          default: 20
+          type: integer
+        num_iters:
+          title: Num Iters
+          default: 1000
+          type: integer
+        max_iters:
+          title: Max Iters
+          default: 20000
+          type: integer
+        stop_v_max:
+          title: Stop V Max
+          default: 0.001
+          type: number
+        dt_max:
+          title: Dt Max
+          default: 100.0
+          type: number
+        prefer_orig_order:
+          title: Prefer Orig Order
+          default: true
+          type: boolean
+        start_cap:
+          title: Start Cap
+          default: 1.0
+          type: number
+        final_cap:
+          title: Final Cap
+          default: 10.0
+          type: number
+        remove_drift:
+          title: Remove Drift
+          default: true
+          type: boolean
+    RegistrationConfig:
+      title: RegistrationConfig
+      type: object
+      properties:
+        overlaps_x:
+          title: Overlaps X
+          default:
+          - 200
+          - 300
+          - 400
+          type: array
+          items:
+            type: integer
+        overlaps_y:
+          title: Overlaps Y
+          default:
+          - 200
+          - 300
+          - 400
+          type: array
+          items:
+            type: integer
+        min_overlap:
+          title: Min Overlap
+          default: 20
+          type: integer
+        min_range:
+          title: Min Range
+          default:
+          - 10
+          - 100
+          - 0
+          type: array
+          items:
+            type: integer
+        patch_size:
+          title: Patch Size
+          default:
+          - 80
+          - 80
+          type: array
+          items:
+            type: integer
+        batch_size:
+          title: Batch Size
+          default: 8000
+          type: integer
+        min_peak_ratio:
+          title: Min Peak Ratio
+          default: 1.4
+          type: number
+        min_peak_sharpness:
+          title: Min Peak Sharpness
+          default: 1.4
+          type: number
+        max_deviation:
+          title: Max Deviation
+          default: 5
+          type: integer
+        max_magnitude:
+          title: Max Magnitude
+          default: 0
+          type: integer
+        min_patch_size:
+          title: Min Patch Size
+          default: 10
+          type: integer
+        max_gradient:
+          title: Max Gradient
+          default: -1.0
+          type: number
+        reconcile_flow_max_deviation:
+          title: Reconcile Flow Max Deviation
+          default: -1.0
+          type: number
+    WarpConfig:
+      title: WarpConfig
+      type: object
+      properties:
+        margin:
+          title: Margin
+          default: 20
+          type: integer
+        use_clahe:
+          title: Use Clahe
+          default: true
+          type: boolean
+        kernel_size:
+          title: Kernel Size
+          default: 1024
+          type: integer
+        clip_limit:
+          title: Clip Limit
+          default: 0.01
+          type: number
+        nbins:
+          title: Nbins
+          default: 256
+          type: integer
+        warp_parallelism:
+          title: Warp Parallelism
+          default: 5
+          type: integer
+timestamp: '2023-07-07T09:53:36.965058+00:00'
+triggers: []

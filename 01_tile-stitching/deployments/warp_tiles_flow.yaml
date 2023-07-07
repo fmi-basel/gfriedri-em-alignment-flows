@@ -1,0 +1,109 @@
+###
+### A complete description of a Prefect Deployment for flow '[SOFIMA] Warp Tiles'
+###
+name: buchtimo
+description: null
+version: 0dae50948b62cc71607d10f4615a4a77
+# The work queue that will handle this deployment's runs
+work_queue_name: buchtimo
+work_pool_name: SLURM
+tags: []
+parameters: {}
+schedule: null
+is_schedule_active: true
+infra_overrides: {}
+
+###
+### DO NOT EDIT BELOW THIS LINE
+###
+flow_name: '[SOFIMA] Warp Tiles'
+manifest_path: null
+infrastructure:
+  type: process
+  env:
+    WF_ENV_NAME: gfriedri-em-alignment-flows
+    PREFECT_LOGGING_LEVEL: INFO
+    PREFECT_LOCAL_STORAGE_PATH: /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/result_storage
+    PREFECT_TASKS_REFRESH_CACHE: 'false'
+  labels: {}
+  name: null
+  command:
+  - /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/slurm/cpu-job.sh
+  stream_output: false
+  working_dir: /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/working_dir
+  _block_document_id: 537afaea-2b18-4e91-9a26-ba2d465c3cdd
+  _block_document_name: gfriedri-em-alignment-buchtimo-cpu
+  _is_anonymous: false
+  block_type_slug: process
+  _block_type_slug: process
+storage:
+  repository: https://github.com/fmi-basel/gfriedri-em-alignment-flows
+  reference: refactor-tile-registration
+  access_token: null
+  include_git_objects: false
+  _block_document_id: 57e117c0-e230-4edc-b20e-0dc64e35f4ed
+  _block_document_name: gfriedri-em-alignment-flow-buchtimo
+  _is_anonymous: false
+  block_type_slug: github
+  _block_type_slug: github
+path: ''
+entrypoint: 01_tile-stitching/prefect_tile_stitching.py:warp_tiles_flow
+parameter_openapi_schema:
+  title: Parameters
+  type: object
+  properties:
+    output_dir:
+      title: output_dir
+      position: 0
+      type: string
+    mesh_files:
+      title: mesh_files
+      position: 1
+      type: array
+      items:
+        type: string
+    stride:
+      title: stride
+      position: 2
+      type: integer
+    warp_config:
+      title: warp_config
+      position: 3
+      allOf:
+      - $ref: '#/definitions/WarpConfig'
+  required:
+  - output_dir
+  - mesh_files
+  - stride
+  - warp_config
+  definitions:
+    WarpConfig:
+      title: WarpConfig
+      type: object
+      properties:
+        margin:
+          title: Margin
+          default: 20
+          type: integer
+        use_clahe:
+          title: Use Clahe
+          default: true
+          type: boolean
+        kernel_size:
+          title: Kernel Size
+          default: 1024
+          type: integer
+        clip_limit:
+          title: Clip Limit
+          default: 0.01
+          type: number
+        nbins:
+          title: Nbins
+          default: 256
+          type: integer
+        warp_parallelism:
+          title: Warp Parallelism
+          default: 5
+          type: integer
+timestamp: '2023-07-07T09:49:34.901288+00:00'
+triggers: []
