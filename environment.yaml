@@ -9,6 +9,7 @@ dependencies:
   - nvidia::cuda-nvcc=11.7
   - pip
   - pip:
+     - questionary
      - psutil
      - tensorflow
      - tensorstore
