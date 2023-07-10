@@ -243,7 +243,7 @@ def get_warp_config():
     use_clahe = questionary.confirm(
         "warp_config.use_clahe:",
         default=True,
-    )
+    ).ask()
     if use_clahe:
         kernel_size = int(
             questionary.text(
@@ -305,25 +305,25 @@ def get_acquistion_config():
             validate=lambda v: v.replace(".", "").isdigit(),
         ).ask()
     )
-    tile_width = float(
+    tile_width = int(
         questionary.text(
             "sbem_config.Tile width:",
             default="3072",
-            validate=lambda v: v.replace(".", "").isdigit(),
+            validate=lambda v: v.isdigit(),
         ).ask()
     )
-    tile_height = float(
+    tile_height = int(
         questionary.text(
             "sbem_config.Tile height:",
             default="2304",
-            validate=lambda v: v.replace(".", "").isdigit(),
+            validate=lambda v: v.isdigit(),
         ).ask()
     )
-    tile_overlap = float(
+    tile_overlap = int(
         questionary.text(
             "sbem_config.Tile overlap:",
             default="200",
-            validate=lambda v: v.replace(".", "").isdigit(),
+            validate=lambda v: v.isdigit(),
         ).ask()
     )
 
