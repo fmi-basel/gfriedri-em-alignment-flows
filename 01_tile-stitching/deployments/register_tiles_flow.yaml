@@ -3,7 +3,7 @@
 ###
 name: buchtimo
 description: null
-version: 0dae50948b62cc71607d10f4615a4a77
+version: 79f34855001a483e06b48bd918895b7f
 # The work queue that will handle this deployment's runs
 work_queue_name: buchtimo
 work_pool_name: SLURM
@@ -21,10 +21,17 @@ manifest_path: null
 infrastructure:
   type: process
   env:
+    XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
     WF_ENV_NAME: gfriedri-em-alignment-flows
+    MKL_NUM_THREADS: '1'
+    OMP_NUM_THREADS: '1'
+    BLIS_NUM_THREADS: '1'
+    NUMEXPR_NUM_THREADS: '1'
+    OPENBLAS_NUM_THREADS: '1'
     PREFECT_LOGGING_LEVEL: INFO
+    VECLIB_MAXIMUM_THREADS: '1'
     PREFECT_LOCAL_STORAGE_PATH: /tungstenfs/scratch/gmicro_prefect/gmicro/buchtimo/SOFIMA/result_storage
-    PREFECT_TASKS_REFRESH_CACHE: 'false'
+    PREFECT_TASKS_REFRESH_CACHE: 'true'
   labels: {}
   name: null
   command:
@@ -204,5 +211,5 @@ parameter_openapi_schema:
           title: Reconcile Flow Max Deviation
           default: -1.0
           type: number
-timestamp: '2023-07-07T09:49:26.325368+00:00'
+timestamp: '2023-07-10T11:21:24.231158+00:00'
 triggers: []
