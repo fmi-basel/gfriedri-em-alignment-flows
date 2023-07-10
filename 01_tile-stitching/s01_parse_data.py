@@ -81,9 +81,9 @@ class AcquisitionConfig(BaseModel):
     tile_overlap: int = 220
 
 
-def main(output_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConfig()):
+def main(section_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConfig()):
     _ = parse_data(
-        output_dir=output_dir,
+        output_dir=section_dir,
         sbem_root_dir=acquisition_conf.sbem_root_dir,
         acquisition=acquisition_conf.acquisition,
         tile_grid=acquisition_conf.tile_grid,
@@ -97,7 +97,7 @@ def main(output_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConfi
 
 if __name__ == "__main__":
     main(
-        output_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
+        section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
         sbem_root_dir="/tungstenfs/scratch/gmicro/prefect-test/gfriedri-em"
         "-alignment-flows/test-data/",
         acquisition="run_0",

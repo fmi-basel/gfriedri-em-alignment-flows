@@ -75,7 +75,7 @@ def main(output_dir: str, section_dir: str, stride: int, warp_config: WarpConfig
 
 if __name__ == "__main__":
     main(
-        output_dir="/home/tibuch/Data/gfriedri/2023-refactor/stitched" "-sections",
+        output_dir="/home/tibuch/Data/gfriedri/2023-refactor/stitched-sections",
         section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
         stride=20,
         warp_config=WarpConfig(),
