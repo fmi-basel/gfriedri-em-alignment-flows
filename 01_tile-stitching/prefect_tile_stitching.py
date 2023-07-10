@@ -222,3 +222,7 @@ def tile_stitching(
     registered_tiles = []
     for run in runs:
         registered_tiles.extend(run.result())
+
+
+if __name__ == "__main__":
+    tile_stitching()
