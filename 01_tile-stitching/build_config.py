@@ -368,3 +368,7 @@ def build_config():
 
     with open("tile-stitching.config", "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
+
+
+if __name__ == "__main__":
+    build_config()
