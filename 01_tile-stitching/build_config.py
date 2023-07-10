@@ -255,7 +255,7 @@ def get_warp_config():
         clip_limit = float(
             questionary.text(
                 "warp_config.clip_limit:",
-                default="1024",
+                default="0.01",
                 validate=lambda v: v.replace(".", "").isdigit(),
             ).ask()
         )
