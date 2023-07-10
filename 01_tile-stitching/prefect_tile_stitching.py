@@ -174,14 +174,14 @@ def warp_tiles_flow(
 def tile_stitching(
     user: str,
     output_dir: str,
-    acquisition_conf: AcquisitionConfig = AcquisitionConfig(),
+    acquisition_config: AcquisitionConfig = AcquisitionConfig(),
     mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
     registration_config: RegistrationConfig = RegistrationConfig(),
     warp_config: WarpConfig = WarpConfig(),
     max_parallel_jobs: int = 10,
 ):
     sections = parse_data_task(
-        output_dir=join(output_dir, "sections"), acquisition_conf=acquisition_conf
+        output_dir=join(output_dir, "sections"), acquisition_conf=acquisition_config
     )
 
     batch_size = int(max(10, min(len(sections) // max_parallel_jobs, 500)))
