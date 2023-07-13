@@ -13,7 +13,7 @@ dependencies:
      - psutil
      - tensorflow
      - tensorstore
-     - git+https://github.com/fmi-basel/gfriedri-em-alignment@v0.2.4
+     - git+https://github.com/fmi-basel/gfriedri-em-alignment@refactor-tile-registration
      - prefect==2.10.*
      - git+https://github.com/fmi-faim/custom-prefect-result@v0.1.7
      - git+https://github.com/fmi-faim/faim-prefect@v0.2.2
