@@ -24,6 +24,7 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
     refresh_cache=True,
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
 )
 def parse_data_task(
     output_dir: str,
@@ -42,7 +43,12 @@ def parse_data_task(
     )
 
 
-@task(task_run_name="submit flow-run: {flow_name}")
+@task(
+    task_run_name="submit flow-run: {flow_name}",
+    persist_result=True,
+    result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
+)
 def submit_flowrun(
     flow_name: str,
     parameters: dict,
@@ -58,6 +64,7 @@ def submit_flowrun(
     name="register-tiles",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
 )
 def register_tiles_task(
     section_yaml_file: str,
@@ -103,6 +110,7 @@ def register_tiles_task(
     name="[SOFIMA] Register Tiles",
     persist_result=True,
     task_runner=SequentialTaskRunner(),
+    cache_result_in_memory=False,
 )
 def register_tiles_flow(
     section_yaml_files: list[str],
@@ -130,6 +138,7 @@ def register_tiles_flow(
     name="warp-tiles",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
 )
 def warp_tiles_task(
     output_dir: str, mesh_file: str, stride: int, warp_config: WarpConfig
@@ -146,6 +155,7 @@ def warp_tiles_task(
     name="[SOFIMA] Warp Tiles",
     persist_result=True,
     task_runner=SequentialTaskRunner(),
+    cache_result_in_memory=False,
 )
 def warp_tiles_flow(
     output_dir: str,
@@ -170,6 +180,7 @@ def warp_tiles_flow(
 @flow(
     name="[SOFIMA] Tile Stitching",
     persist_result=True,
+    cache_result_in_memory=False,
 )
 def tile_stitching(
     user: str,
