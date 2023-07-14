@@ -140,13 +140,18 @@ def register_tiles_flow(
 
 @task(
     name="warp-tiles",
+    task_run_name="warp-tiles: {section_name}",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
 )
 def warp_tiles_task(
-    output_dir: str, mesh_file: str, stride: int, warp_config: WarpConfig
+    section_name: str,
+    output_dir: str,
+    mesh_file: str,
+    stride: int,
+    warp_config: WarpConfig,
 ):
     return warp_tiles(
         output_dir=output_dir,
@@ -174,7 +179,11 @@ def warp_tiles_flow(
     mesh_files = filter_ignore(mesh_files, file_name="meshes.npz")
 
     for mesh_file in mesh_files:
+        section = Section.load_from_yaml(
+            mesh_file.replace("meshes.npz", "section.yaml")
+        )
         warp_tiles_task(
+            section_name=section.get_name(),
             output_dir=output_dir,
             mesh_file=mesh_file,
             stride=stride,
