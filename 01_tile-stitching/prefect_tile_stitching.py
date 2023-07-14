@@ -4,6 +4,7 @@ from prefect import flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
+from prefect.tasks import task_input_hash
 from s01_parse_data import AcquisitionConfig, parse_data
 from s02_register_tiles import MeshIntegrationConfig, RegistrationConfig, filter_ignore
 from s03_warp_tiles import WarpConfig, warp_tiles
@@ -25,6 +26,7 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
 )
 def parse_data_task(
     output_dir: str,
@@ -48,6 +50,7 @@ def parse_data_task(
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
 )
 def submit_flowrun(
     flow_name: str,
@@ -65,6 +68,7 @@ def submit_flowrun(
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
 )
 def register_tiles_task(
     section_yaml_file: str,
@@ -139,6 +143,7 @@ def register_tiles_flow(
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
 )
 def warp_tiles_task(
     output_dir: str, mesh_file: str, stride: int, warp_config: WarpConfig
