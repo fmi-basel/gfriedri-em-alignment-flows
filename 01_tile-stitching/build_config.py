@@ -3,6 +3,12 @@ from os.path import join
 
 import questionary
 import yaml
+from parameter_config import (
+    AcquisitionConfig,
+    MeshIntegrationConfig,
+    RegistrationConfig,
+    WarpConfig,
+)
 
 
 def get_mesh_integration_config():
@@ -90,8 +96,6 @@ def get_mesh_integration_config():
         "mesh_integration_config.remove_drift:",
         default=True,
     ).ask()
-
-    from s02_register_tiles import MeshIntegrationConfig
 
     return MeshIntegrationConfig(
         dt=dt,
@@ -215,8 +219,6 @@ def get_registration_config():
         ).ask()
     )
 
-    from s02_register_tiles import RegistrationConfig
-
     return RegistrationConfig(
         overlaps_X=overlaps_x,
         overlaps_y=overlaps_y,
@@ -275,8 +277,6 @@ def get_warp_config():
         ).ask()
     )
 
-    from s03_warp_tiles import WarpConfig
-
     return WarpConfig(
         margin=margin,
         use_clahe=use_clahe,
@@ -326,8 +326,6 @@ def get_acquistion_config():
             validate=lambda v: v.isdigit(),
         ).ask()
     )
-
-    from prefect_tile_stitching import AcquisitionConfig
 
     return AcquisitionConfig(
         sbem_root_dir=sbem_root_dir,

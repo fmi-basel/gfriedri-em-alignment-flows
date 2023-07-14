@@ -1,7 +1,7 @@
 from glob import glob
 from os.path import exists, join
 
-from pydantic import BaseModel
+from parameter_config import AcquisitionConfig
 from sbem.experiment.parse_utils import get_tile_metadata
 from sbem.record.Section import Section
 from sbem.record.Tile import Tile
@@ -68,17 +68,6 @@ def parse_data(
         section_paths.append(join(output_dir, section.get_name(), "section.yaml"))
 
     return section_paths
-
-
-class AcquisitionConfig(BaseModel):
-    sbem_root_dir: str = ""
-    acquisition: str = "run_0"
-    tile_grid: str = "g0001"
-    thickness: float = 25
-    resolution_xy: float = 11
-    tile_width: int = 3072
-    tile_height: int = 2304
-    tile_overlap: int = 220
 
 
 def main(section_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConfig()):

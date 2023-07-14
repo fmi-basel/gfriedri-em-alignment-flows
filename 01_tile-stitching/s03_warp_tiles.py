@@ -6,19 +6,10 @@ from numcodecs import Blosc
 from ome_zarr.io import parse_url
 from ome_zarr.scale import Scaler
 from ome_zarr.writer import write_image
-from pydantic import BaseModel
+from parameter_config import WarpConfig
 from sbem.record.Section import Section
 from sbem.tile_stitching.sofima_utils import render_tiles
 from tqdm import tqdm
-
-
-class WarpConfig(BaseModel):
-    margin: int = 20
-    use_clahe: bool = True
-    kernel_size: int = 1024
-    clip_limit: float = 0.01
-    nbins: int = 256
-    warp_parallelism: int = 5
 
 
 def warp_tiles(output_dir: str, mesh_file: str, stride: int, warp_config: WarpConfig):
