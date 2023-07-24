@@ -69,6 +69,7 @@ def submit_flowrun(
 
 @task(
     name="register-tiles",
+    task_run_name="register-tiles: {section_name}",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
@@ -76,6 +77,7 @@ def submit_flowrun(
 )
 def register_tiles_task(
     section_yaml_file: str,
+    section_name: str,
     mesh_integration_config: MeshIntegrationConfig,
     registration_config: RegistrationConfig,
 ):
@@ -135,6 +137,7 @@ def register_tiles_flow(
         meshes.append(
             register_tiles_task(
                 section_yaml_file=section_yaml_file,
+                section_name=Section.load_from_yaml(path=section_yaml_file).get_name(),
                 mesh_integration_config=mesh_integration_config,
                 registration_config=registration_config,
             )
