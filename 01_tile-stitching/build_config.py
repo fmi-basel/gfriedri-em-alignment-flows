@@ -344,6 +344,21 @@ def build_config():
     output_dir = questionary.path("Path to the output directory:").ask()
     acquisition_config = get_acquistion_config()
 
+    start_section = int(
+        questionary.text(
+            "start_section:",
+            default="0",
+            validate=lambda v: v.isdigit(),
+        ).ask()
+    )
+    end_section = int(
+        questionary.text(
+            "end_section:",
+            default="10",
+            validate=lambda v: v.isdigit(),
+        ).ask()
+    )
+
     section_dir = join(output_dir, "sections")
     mesh_integration_config = get_mesh_integration_config()
     registration_config = get_registration_config()
@@ -358,6 +373,8 @@ def build_config():
         user=user_name,
         output_dir=output_dir,
         acquisition_config=dict(acquisition_config),
+        start_section=start_section,
+        end_section=end_section,
         mesh_integration_config=dict(mesh_integration_config),
         registration_config=dict(registration_config),
         warp_config=dict(warp_config),

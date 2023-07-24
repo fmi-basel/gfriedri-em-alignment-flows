@@ -31,6 +31,8 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 def parse_data_task(
     output_dir: str,
     acquisition_conf: AcquisitionConfig,
+    start_section: int,
+    end_section: int,
 ):
     return parse_data(
         output_dir=output_dir,
@@ -42,6 +44,8 @@ def parse_data_task(
         tile_width=acquisition_conf.tile_width,
         tile_height=acquisition_conf.tile_height,
         tile_overlap=acquisition_conf.tile_overlap,
+        start_section=start_section,
+        end_section=end_section,
     )
 
 
@@ -205,13 +209,18 @@ def tile_stitching(
     user: str,
     output_dir: str,
     acquisition_config: AcquisitionConfig = AcquisitionConfig(),
+    start_section: int = 0,
+    end_section: int = 10,
     mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
     registration_config: RegistrationConfig = RegistrationConfig(),
     warp_config: WarpConfig = WarpConfig(),
     max_parallel_jobs: int = 10,
 ):
     sections = parse_data_task(
-        output_dir=join(output_dir, "sections"), acquisition_conf=acquisition_config
+        output_dir=join(output_dir, "sections"),
+        acquisition_conf=acquisition_config,
+        start_section=start_section,
+        end_section=end_section,
     )
 
     batch_size = int(max(10, min(len(sections) // max_parallel_jobs, 500)))

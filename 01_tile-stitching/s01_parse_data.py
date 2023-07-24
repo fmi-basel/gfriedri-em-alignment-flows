@@ -7,6 +7,12 @@ from sbem.record.Section import Section
 from sbem.record.Tile import Tile
 
 
+def section_in_range(name: str, start: int, end: int) -> bool:
+    s, _ = name.split("_")
+    z = int(s[1:])
+    return start <= z <= end
+
+
 def parse_data(
     output_dir: str,
     sbem_root_dir: str,
@@ -17,6 +23,8 @@ def parse_data(
     tile_width: int,
     tile_height: int,
     tile_overlap: int,
+    start_section: int,
+    end_section: int,
 ):
     tile_grid_num = int(tile_grid[1:])
 
@@ -30,33 +38,35 @@ def parse_data(
     existing_sections = glob(join(output_dir, "*", "section.yaml"))
     for es in existing_sections:
         section = Section.load_from_yaml(es)
-        sections[section.get_name()] = section
+        if section_in_range(section.get_name(), start_section, end_section):
+            sections[section.get_name()] = section
 
     for tile_spec in tile_specs:
         section_name = f"s{tile_spec['z']}_g{tile_grid_num}"
-        if section_name in sections.keys():
-            section = sections[section_name]
-        else:
-            section = Section(
-                acquisition=acquisition,
-                section_num=tile_spec["z"],
-                tile_grid_num=tile_grid_num,
-                thickness=thickness,
-                tile_height=tile_height,
-                tile_width=tile_width,
-                tile_overlap=tile_overlap,
-            )
-            sections[section_name] = section
+        if section_in_range(section_name, start_section, end_section):
+            if section_name in sections.keys():
+                section = sections[section_name]
+            else:
+                section = Section(
+                    acquisition=acquisition,
+                    section_num=tile_spec["z"],
+                    tile_grid_num=tile_grid_num,
+                    thickness=thickness,
+                    tile_height=tile_height,
+                    tile_width=tile_width,
+                    tile_overlap=tile_overlap,
+                )
+                sections[section_name] = section
 
-        Tile(
-            section,
-            tile_id=tile_spec["tile_id"],
-            path=tile_spec["tile_file"],
-            stage_x=tile_spec["x"],
-            stage_y=tile_spec["y"],
-            resolution_xy=resolution_xy,
-            unit="nm",
-        )
+            Tile(
+                section,
+                tile_id=tile_spec["tile_id"],
+                path=tile_spec["tile_file"],
+                stage_x=tile_spec["x"],
+                stage_y=tile_spec["y"],
+                resolution_xy=resolution_xy,
+                unit="nm",
+            )
 
     section_paths = []
     for section in sections.values():
@@ -70,7 +80,12 @@ def parse_data(
     return section_paths
 
 
-def main(section_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConfig()):
+def main(
+    section_dir: str,
+    acquisition_conf: AcquisitionConfig = AcquisitionConfig(),
+    start_section: int = 0,
+    end_section: int = 10,
+):
     _ = parse_data(
         output_dir=section_dir,
         sbem_root_dir=acquisition_conf.sbem_root_dir,
@@ -81,6 +96,8 @@ def main(section_dir: str, acquisition_conf: AcquisitionConfig = AcquisitionConf
         tile_width=acquisition_conf.tile_width,
         tile_height=acquisition_conf.tile_height,
         tile_overlap=acquisition_conf.tile_overlap,
+        start_section=start_section,
+        end_section=end_section,
     )
 
 
@@ -96,4 +113,6 @@ if __name__ == "__main__":
         tile_width=3072,
         tile_height=2304,
         tile_overlap=220,
+        start_section=1074,
+        end_section=1098,
     )
