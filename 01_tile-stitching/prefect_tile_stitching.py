@@ -1,6 +1,6 @@
 from os.path import dirname, join
 
-from prefect import flow, task
+from prefect import State, flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -132,16 +132,22 @@ def register_tiles_flow(
 
     section_yaml_files = filter_ignore(section_yaml_files, file_name="section.yaml")
 
-    meshes = []
+    states: list[State] = []
     for section_yaml_file in section_yaml_files:
-        meshes.append(
+        states.append(
             register_tiles_task(
                 section_yaml_file=section_yaml_file,
                 section_name=Section.load_from_yaml(path=section_yaml_file).get_name(),
                 mesh_integration_config=mesh_integration_config,
                 registration_config=registration_config,
+                return_state=True,
             )
         )
+
+    meshes = []
+    for state in states:
+        if state.is_completed():
+            meshes.append(state.result())
 
     return meshes
 
@@ -245,7 +251,7 @@ def tile_stitching(
 
     meshes = []
     for run in runs:
-        meshes.extend(run.result())
+        meshes.extend(run.result(raise_on_failure=False))
 
     runs = []
     for i in range(0, len(meshes), batch_size):
