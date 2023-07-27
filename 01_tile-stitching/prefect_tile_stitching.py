@@ -1,10 +1,12 @@
 import json
 import os
+import traceback
 from os.path import dirname, exists, join
 
 from prefect import State, flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.states import get_state_exception
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from s01_parse_data import AcquisitionConfig, parse_data
@@ -125,7 +127,7 @@ def register_tiles_task(
     cache_result_in_memory=False,
     retries=1,
 )
-def register_tiles_flow(
+async def register_tiles_flow(
     section_yaml_files: list[str],
     mesh_integration_config: MeshIntegrationConfig,
     registration_config: RegistrationConfig,
@@ -164,6 +166,11 @@ def register_tiles_flow(
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
                 json.dump(state.message, f, indent=4)
+                json.dump("\n---\n", f)
+
+                e: BaseException = await get_state_exception(state)
+                traceback_str = "".join(traceback.format_tb(e.__traceback__))
+                json.dump(traceback_str, f, indent=4)
 
     return meshes
 
