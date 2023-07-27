@@ -64,7 +64,7 @@ def submit_flowrun(
         name=flow_name,
         parameters=parameters,
     )
-    return run.state.result()
+    return run.state.result(raise_on_failure=False)
 
 
 @task(
