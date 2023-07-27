@@ -1,4 +1,3 @@
-import json
 import os
 import traceback
 from os.path import dirname, exists, join
@@ -165,12 +164,12 @@ async def register_tiles_flow(
             meshes.append(state.result())
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
-                json.dump(state.message, f, indent=4)
-                json.dump("\n---\n", f)
+                f.write(state.message)
+                f.write("\n---\n")
 
                 e: BaseException = await get_state_exception(state)
                 traceback_str = "".join(traceback.format_tb(e.__traceback__))
-                json.dump(traceback_str, f, indent=4)
+                f.write(traceback_str)
 
     return meshes
 
