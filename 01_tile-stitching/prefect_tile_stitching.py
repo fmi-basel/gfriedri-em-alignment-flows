@@ -1,6 +1,7 @@
-from os.path import dirname, join
+import os
+from os.path import dirname, exists, join
 
-from prefect import flow, task
+from prefect import State, flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -123,25 +124,45 @@ def register_tiles_task(
     cache_result_in_memory=False,
     retries=1,
 )
-def register_tiles_flow(
+async def register_tiles_flow(
     section_yaml_files: list[str],
     mesh_integration_config: MeshIntegrationConfig,
     registration_config: RegistrationConfig,
+    error_log_dir: str,
 ):
     cvx2.setNumThreads(1)
 
     section_yaml_files = filter_ignore(section_yaml_files, file_name="section.yaml")
 
-    meshes = []
+    states: list[tuple[str, State]] = []
     for section_yaml_file in section_yaml_files:
-        meshes.append(
-            register_tiles_task(
-                section_yaml_file=section_yaml_file,
-                section_name=Section.load_from_yaml(path=section_yaml_file).get_name(),
-                mesh_integration_config=mesh_integration_config,
-                registration_config=registration_config,
+        section_name = Section.load_from_yaml(path=section_yaml_file).get_name()
+        states.append(
+            tuple(
+                [
+                    section_name,
+                    register_tiles_task(
+                        section_yaml_file=section_yaml_file,
+                        section_name=section_name,
+                        mesh_integration_config=mesh_integration_config,
+                        registration_config=registration_config,
+                        return_state=True,
+                    ),
+                ]
             )
         )
+
+    meshes = []
+    for section_name, state in states:
+        err_log_file = join(error_log_dir, f"{section_name}.err")
+        if state.is_completed():
+            if exists(err_log_file):
+                os.rename(err_log_file, f"{err_log_file}.solved")
+
+            meshes.append(state.result())
+        else:
+            with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
+                f.write(state.message)
 
     return meshes
 
@@ -230,6 +251,8 @@ def tile_stitching(
     n_jobs = len(sections) // batch_size + 1
     batch_size = len(sections) // n_jobs
 
+    tile_reg_err_log_dir = join(output_dir, "tile_registration_errors")
+    os.makedirs(tile_reg_err_log_dir, exist_ok=True)
     runs = []
     for i in range(0, len(sections), batch_size):
         runs.append(
@@ -239,6 +262,7 @@ def tile_stitching(
                     section_yaml_files=sections[i : i + batch_size],
                     mesh_integration_config=mesh_integration_config,
                     registration_config=registration_config,
+                    error_log_dir=tile_reg_err_log_dir,
                 ),
             )
         )
