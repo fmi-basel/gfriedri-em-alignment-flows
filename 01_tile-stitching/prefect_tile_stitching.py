@@ -148,6 +148,8 @@ def register_tiles_flow(
     for state in states:
         if state.is_completed():
             meshes.append(state.result())
+        else:
+            state.result(raise_on_failure=True)
 
     return meshes
 
