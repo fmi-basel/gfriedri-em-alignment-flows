@@ -124,7 +124,7 @@ def register_tiles_task(
     cache_result_in_memory=False,
     retries=1,
 )
-async def register_tiles_flow(
+def register_tiles_flow(
     section_yaml_files: list[str],
     mesh_integration_config: MeshIntegrationConfig,
     registration_config: RegistrationConfig,
