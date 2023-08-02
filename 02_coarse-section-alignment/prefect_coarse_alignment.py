@@ -23,7 +23,7 @@ def filter(section_dirs: list[str], start_section: int, end_section: int):
 @task(
     task_run_name="submit flow-run: {flow_name}",
     persist_result=True,
-    result_storage_key=RESULT_STORAGE_KEY,
+    result_storage_key="{flow_run.name}/submit flow-run/{task_run.id}.json",
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
 )
@@ -99,7 +99,7 @@ def coarse_alignment(
     end_section: int = 10,
     max_parallel_jobs: int = 10,
 ):
-    section_dirs = list_zarr_sections(
+    section_dirs = list_zarr_sections_task(
         root_dir=stitched_sections_dir,
     )
 
