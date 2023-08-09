@@ -126,10 +126,10 @@ def register_tiles_task(
     retries=1,
 )
 def register_tiles_flow(
-    section_yaml_files: list[str],
-    mesh_integration_config: MeshIntegrationConfig,
-    registration_config: RegistrationConfig,
-    error_log_dir: str,
+    section_yaml_files: list[str] = [""],
+    mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    registration_config: RegistrationConfig = RegistrationConfig(),
+    error_log_dir: str = "",
 ):
     cvx2.setNumThreads(1)
 
