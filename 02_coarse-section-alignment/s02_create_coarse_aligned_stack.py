@@ -24,8 +24,9 @@ def load_shifts(section_dirs: list[str]):
 
 def get_padding_per_section(shifts):
     cumulated_shifts = np.cumsum(shifts, axis=0)
+    cumulated_shifts = np.concatenate([np.array([[0, 0]]), cumulated_shifts], 0)
     cumulated_padding = cumulated_shifts + np.abs(np.min(cumulated_shifts, axis=0))
-    return np.concatenate([np.array([[0, 0]]), cumulated_padding], 0)
+    return cumulated_padding
 
 
 def write_section(
