@@ -1,7 +1,7 @@
 import os
 from os.path import dirname, exists, join
 
-from prefect import State, flow, task
+from prefect import State, flow, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -114,6 +114,7 @@ def register_tiles_task(
             final_cap=mesh_integration_config.final_cap,
             remove_drift=mesh_integration_config.remove_drift,
         ),
+        logger=get_run_logger(),
     )
 
 
