@@ -98,7 +98,7 @@ def estimate_flow_field(
         current_section = load_section_data(
             section_dir=section_dirs[i],
         )
-        current_name = splitext(basename(section_dirs[i]))
+        current_name = splitext(basename(section_dirs[i]))[0]
 
         flows1x = mfc.flow_field(
             previous_section,
