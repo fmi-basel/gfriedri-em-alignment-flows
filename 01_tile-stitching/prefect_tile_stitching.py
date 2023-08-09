@@ -164,8 +164,6 @@ def register_tiles_flow(
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
                 f.writelines(state.message)
-                ex: ValueError = state.result(raise_on_failure=False)
-                f.writelines(str(ex))
 
     return meshes
 
