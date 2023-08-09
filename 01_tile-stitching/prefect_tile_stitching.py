@@ -163,7 +163,7 @@ def register_tiles_flow(
             meshes.append(state.result())
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
-                f.write(state.message)
+                f.writelines(state.message)
 
     return meshes
 
