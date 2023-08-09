@@ -1,7 +1,7 @@
 import os
 from os.path import dirname, exists, join
 
-from prefect import State, flow, task
+from prefect import State, flow, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -114,6 +114,7 @@ def register_tiles_task(
             final_cap=mesh_integration_config.final_cap,
             remove_drift=mesh_integration_config.remove_drift,
         ),
+        logger=get_run_logger(),
     )
 
 
@@ -125,10 +126,10 @@ def register_tiles_task(
     retries=1,
 )
 def register_tiles_flow(
-    section_yaml_files: list[str],
-    mesh_integration_config: MeshIntegrationConfig,
-    registration_config: RegistrationConfig,
-    error_log_dir: str,
+    section_yaml_files: list[str] = [""],
+    mesh_integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    registration_config: RegistrationConfig = RegistrationConfig(),
+    error_log_dir: str = "",
 ):
     cvx2.setNumThreads(1)
 
@@ -162,7 +163,7 @@ def register_tiles_flow(
             meshes.append(state.result())
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
-                f.write(state.message)
+                f.writelines(state.message)
 
     return meshes
 

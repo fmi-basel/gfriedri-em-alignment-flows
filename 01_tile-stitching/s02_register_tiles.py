@@ -1,3 +1,4 @@
+import logging
 from glob import glob
 from os.path import dirname, exists, join
 
@@ -45,6 +46,7 @@ def run_tile_registration(
             final_cap=mesh_integration_config.final_cap,
             remove_drift=mesh_integration_config.remove_drift,
         ),
+        logger=logging.getLogger("Tile-Registration"),
     )
 
 
