@@ -3,36 +3,107 @@ import yaml
 
 
 def build_config():
-    user_name = questionary.text("User name:").ask()
-    stitched_sections_dir = questionary.path(
-        "Path to the stitched sections " "directory:"
+    config_option = questionary.select(
+        "Build config for:",
+        choices=["shift-computation", "coarse-stack"],
+        default="shift-computation",
     ).ask()
 
-    start_section = int(
-        questionary.text(
-            "start_section:",
-            default="0",
-            validate=lambda v: v.isdigit(),
+    if config_option == "shift-computation":
+        user_name = questionary.text("User name:").ask()
+        stitched_sections_dir = questionary.path(
+            "Path to the stitched sections " "directory:"
         ).ask()
-    )
-    end_section = int(
-        questionary.text(
-            "end_section:",
-            default="10",
-            validate=lambda v: v.isdigit(),
+
+        start_section = int(
+            questionary.text(
+                "start_section:",
+                default="0",
+                validate=lambda v: v.isdigit(),
+            ).ask()
+        )
+        end_section = int(
+            questionary.text(
+                "end_section:",
+                default="10",
+                validate=lambda v: v.isdigit(),
+            ).ask()
+        )
+
+        config = dict(
+            user=user_name,
+            stitched_sections_dir=stitched_sections_dir,
+            start_section=start_section,
+            end_section=end_section,
+            max_parallel_jobs=10,
+        )
+
+        with open("coarse-align.config", "w") as f:
+            yaml.safe_dump(config, f, sort_keys=False)
+    elif config_option == "coarse-stack":
+        user_name = questionary.text("User name:").ask()
+        stitched_sections_dir = questionary.path(
+            "Path to the stitched sections " "directory:"
         ).ask()
-    )
 
-    config = dict(
-        user=user_name,
-        stitched_sections_dir=stitched_sections_dir,
-        start_section=start_section,
-        end_section=end_section,
-        max_parallel_jobs=10,
-    )
+        start_section = int(
+            questionary.text(
+                "start_section:",
+                default="0",
+                validate=lambda v: v.isdigit(),
+            ).ask()
+        )
+        end_section = int(
+            questionary.text(
+                "end_section:",
+                default="10",
+                validate=lambda v: v.isdigit(),
+            ).ask()
+        )
 
-    with open("coarse-align.config", "w") as f:
-        yaml.safe_dump(config, f, sort_keys=False)
+        output_dir = questionary.text("Output dir:").ask()
+        volume_name = questionary.text("Volume name:").ask()
+        yx_start = tuple(
+            int(i)
+            for i in questionary.text(
+                "YX start-coordinates:",
+                default="0,0",
+                validate=lambda v: v.replace(",", "").isdigit(),
+            )
+            .ask()
+            .split(",")
+        )
+        yx_size = tuple(
+            int(i)
+            for i in questionary.text(
+                "YX size:",
+                default="0,0",
+                validate=lambda v: v.replace(",", "").isdigit(),
+            )
+            .ask()
+            .split(",")
+        )
+        bin = int(
+            questionary.text(
+                "Bin factor:", default="2", validate=lambda v: v.isdigit()
+            ).ask()
+        )
+
+        config = dict(
+            user=user_name,
+            stitched_sections_dir=stitched_sections_dir,
+            start_section=start_section,
+            end_section=end_section,
+            output_dir=output_dir,
+            volume_name=volume_name,
+            yx_start=yx_start,
+            yx_size=yx_size,
+            bin=bin,
+            max_parallel_jobs=10,
+        )
+
+        with open("coarse-stack.config", "w") as f:
+            yaml.safe_dump(config, f, sort_keys=False)
 
 
 if __name__ == "__main__":
