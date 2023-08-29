@@ -103,6 +103,10 @@ def refine_coarse_alignment(s1, s2, s2_shift, coarse_bin):
                     if abs(shift_y) <= coarse_bin and abs(shift_x) <= coarse_bin:
                         shifts_yx.append([shift_y, shift_x])
 
+    if len(shifts_yx) == 0:
+        # No shift if all patches got rejected.
+        shifts_yx.append([0, 0])
+
     return tuple(np.mean(shifts_yx, axis=0).astype(int))
 
 
