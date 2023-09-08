@@ -248,7 +248,7 @@ def tile_stitching(
         end_section=end_section,
     )
 
-    batch_size = int(max(10, min(len(sections) // max_parallel_jobs, 500)))
+    batch_size = int(max(10, min(len(sections) // max_parallel_jobs, 250)))
     n_jobs = len(sections) // batch_size + 1
     batch_size = len(sections) // n_jobs
 
