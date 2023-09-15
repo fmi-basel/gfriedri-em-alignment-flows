@@ -56,6 +56,7 @@ def parse_data_task(
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
+    refresh_cache=True,
 )
 def submit_flowrun(
     flow_name: str,
