@@ -4,6 +4,7 @@ from os.path import dirname, exists, join
 from prefect import State, flow, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from s01_parse_data import AcquisitionConfig, parse_data
@@ -124,7 +125,7 @@ def register_tiles_task(
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def register_tiles_flow(
     section_yaml_files: list[str] = [""],
@@ -155,6 +156,7 @@ def register_tiles_flow(
         )
 
     meshes = []
+    failed_meshes = []
     for section_name, state in states:
         err_log_file = join(error_log_dir, f"{section_name}.err")
         if state.is_completed():
@@ -165,8 +167,12 @@ def register_tiles_flow(
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
                 f.writelines(state.message)
+            failed_meshes.append(section_name)
 
-    return meshes
+    if len(failed_meshes) > 0:
+        return Failed(message=f"Tile registration failed for sections: {failed_meshes}")
+    else:
+        return Completed()
 
 
 @task(
@@ -176,7 +182,7 @@ def register_tiles_flow(
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
-    retries=1,
+    retries=0,
     retry_delay_seconds=1,
 )
 def warp_tiles_task(
@@ -199,7 +205,7 @@ def warp_tiles_task(
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def warp_tiles_flow(
     output_dir: str,
@@ -229,7 +235,7 @@ def warp_tiles_flow(
     name="[SOFIMA] Tile Stitching",
     persist_result=True,
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def tile_stitching(
     user: str,

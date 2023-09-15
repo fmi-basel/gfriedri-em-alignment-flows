@@ -76,7 +76,7 @@ def compute_final_flow(
     )
 
 
-def estimate_flow_field(
+def estimate_flow_fields(
     stitched_section_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
@@ -155,7 +155,7 @@ def estimate_flow_field(
 
 
 if __name__ == "__main__":
-    estimate_flow_field(
+    estimate_flow_fields(
         stitched_section_dir="/tungstenfs/temp/generic/stitched-sections/",
         start_section=1074,
         end_section=1088,
