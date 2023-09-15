@@ -125,7 +125,7 @@ def register_tiles_task(
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def register_tiles_flow(
     section_yaml_files: list[str] = [""],
@@ -182,7 +182,7 @@ def register_tiles_flow(
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
-    retries=1,
+    retries=0,
     retry_delay_seconds=1,
 )
 def warp_tiles_task(
@@ -205,7 +205,7 @@ def warp_tiles_task(
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def warp_tiles_flow(
     output_dir: str,
@@ -235,7 +235,7 @@ def warp_tiles_flow(
     name="[SOFIMA] Tile Stitching",
     persist_result=True,
     cache_result_in_memory=False,
-    retries=1,
+    retries=0,
 )
 def tile_stitching(
     user: str,
