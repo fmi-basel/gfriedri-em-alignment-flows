@@ -4,6 +4,7 @@ from os.path import dirname, exists, join
 from prefect import State, flow, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from s01_parse_data import AcquisitionConfig, parse_data
@@ -155,6 +156,7 @@ def register_tiles_flow(
         )
 
     meshes = []
+    failed_meshes = []
     for section_name, state in states:
         err_log_file = join(error_log_dir, f"{section_name}.err")
         if state.is_completed():
@@ -165,8 +167,12 @@ def register_tiles_flow(
         else:
             with open(join(error_log_dir, f"{section_name}.err"), "w") as f:
                 f.writelines(state.message)
+            failed_meshes.append(section_name)
 
-    return meshes
+    if len(failed_meshes) > 0:
+        return Failed(message=f"Tile registration failed for sections: {failed_meshes}")
+    else:
+        return Completed()
 
 
 @task(
