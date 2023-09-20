@@ -170,9 +170,12 @@ def register_tiles_flow(
             failed_meshes.append(section_name)
 
     if len(failed_meshes) > 0:
-        return Failed(message=f"Tile registration failed for sections: {failed_meshes}")
+        return Failed(
+            message=f"Tile registration failed for sections: {failed_meshes}",
+            data=meshes,
+        )
     else:
-        return Completed()
+        return Completed(data=meshes)
 
 
 @task(
