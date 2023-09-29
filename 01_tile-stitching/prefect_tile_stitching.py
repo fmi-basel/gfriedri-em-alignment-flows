@@ -67,7 +67,12 @@ def submit_flowrun(
         name=flow_name,
         parameters=parameters,
     )
-    return run.state.result()
+    if run.state.is_completed():
+        return run.state.result()
+    elif run.state.is_failed():
+        return run.state.data
+    else:
+        return run.state.result()
 
 
 @task(
