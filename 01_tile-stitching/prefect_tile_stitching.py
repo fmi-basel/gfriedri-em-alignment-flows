@@ -293,7 +293,7 @@ def tile_stitching(
     for run in runs:
         if run.is_failed():
             some_failed = True
-        meshes.extend(run.result(raise_on_failure=False))
+        meshes.extend(run.result(raise_on_failure=False).result(raise_on_failure=False))
         get_run_logger().info(meshes)
 
     get_run_logger().info(meshes)
