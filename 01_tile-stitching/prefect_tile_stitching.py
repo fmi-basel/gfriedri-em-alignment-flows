@@ -52,17 +52,14 @@ def parse_data_task(
 
 
 @task(
-    task_run_name="submit flow-run: {flow_name}",
+    task_run_name="submit-flow-run-{flow_name}-{batch}",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
     refresh_cache=True,
 )
-def submit_flowrun(
-    flow_name: str,
-    parameters: dict,
-):
+def submit_flowrun(flow_name: str, parameters: dict, batch: int):
     run: FlowRun = run_deployment(
         name=flow_name,
         parameters=parameters,
@@ -77,7 +74,7 @@ def submit_flowrun(
 
 @task(
     name="register-tiles",
-    task_run_name="register-tiles: {section_name}",
+    task_run_name="register-tiles-{section_name}",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
@@ -190,7 +187,7 @@ def register_tiles_flow(
 
 @task(
     name="warp-tiles",
-    task_run_name="warp-tiles: {section_name}",
+    task_run_name="warp-tiles-{section_name}",
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
     cache_result_in_memory=False,
@@ -275,7 +272,7 @@ def tile_stitching(
     tile_reg_err_log_dir = join(output_dir, "tile_registration_errors")
     os.makedirs(tile_reg_err_log_dir, exist_ok=True)
     runs = []
-    for i in range(0, len(sections), batch_size):
+    for batch_number, i in enumerate(range(0, len(sections), batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Register Tiles/{user}",
@@ -285,6 +282,7 @@ def tile_stitching(
                     registration_config=registration_config,
                     error_log_dir=tile_reg_err_log_dir,
                 ),
+                batch=batch_number,
             )
         )
 
@@ -296,7 +294,7 @@ def tile_stitching(
     get_run_logger().info(meshes)
 
     runs = []
-    for i in range(0, len(meshes), batch_size):
+    for batch_number, i in enumerate(range(0, len(meshes), batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Warp Tiles/{user}",
@@ -306,6 +304,7 @@ def tile_stitching(
                     stride=mesh_integration_config.stride,
                     warp_config=warp_config,
                 ),
+                batch=batch_number,
             )
         )
 
