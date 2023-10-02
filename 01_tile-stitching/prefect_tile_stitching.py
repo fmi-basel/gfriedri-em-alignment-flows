@@ -65,6 +65,12 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
         parameters=parameters,
     )
     return run.state.result()
+    # if run.state.is_completed():
+    #     return run.state.result()
+    # elif run.state.is_failed():
+    #     return run.state.result(raise_on_failure=False)
+    # else:
+    #     return run.state.result()
 
 
 @task(
@@ -278,12 +284,16 @@ def tile_stitching(
                     error_log_dir=tile_reg_err_log_dir,
                 ),
                 batch=batch_number,
+                return_state=True,
             )
         )
 
+    some_failed = False
     meshes = []
     for run in runs:
-        meshes.extend(run.result())
+        if run.is_failed():
+            some_failed = True
+        meshes.extend(run.result(raise_on_failure=False))
         get_run_logger().info(meshes)
 
     get_run_logger().info(meshes)
@@ -306,6 +316,11 @@ def tile_stitching(
     registered_tiles = []
     for run in runs:
         registered_tiles.extend(run.result())
+
+    if some_failed:
+        return Failed()
+    else:
+        return Completed()
 
 
 if __name__ == "__main__":
