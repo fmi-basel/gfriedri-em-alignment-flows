@@ -67,7 +67,7 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
     if run.state.is_completed():
         return run.state.result()
     elif run.state.is_failed():
-        return run.state.data
+        return run.state.result(raise_on_failure=False)
     else:
         return run.state.result()
 
