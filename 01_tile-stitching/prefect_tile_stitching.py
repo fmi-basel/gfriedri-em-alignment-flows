@@ -290,6 +290,8 @@ def tile_stitching(
     for run in runs:
         meshes.extend(run.result())
 
+    get_run_logger().info(meshes)
+
     runs = []
     for i in range(0, len(meshes), batch_size):
         runs.append(
