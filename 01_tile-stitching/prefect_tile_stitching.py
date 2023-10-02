@@ -177,6 +177,8 @@ def register_tiles_flow(
                 f.writelines(state.message)
             failed_meshes.append(section_name)
 
+        get_run_logger().info(f"From Register Tiles: " f"{section_name} - {meshes[-1]}")
+
     if len(failed_meshes) > 0:
         return Failed(
             message=f"Tile registration failed for sections: {failed_meshes}",
@@ -289,6 +291,7 @@ def tile_stitching(
     meshes = []
     for run in runs:
         meshes.extend(run.result())
+        get_run_logger().info(meshes)
 
     get_run_logger().info(meshes)
 
