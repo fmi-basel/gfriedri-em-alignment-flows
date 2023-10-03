@@ -284,14 +284,14 @@ def tile_stitching(
                     error_log_dir=tile_reg_err_log_dir,
                 ),
                 batch=batch_number,
-                return_state=True,
+                return_state=False,
             )
         )
 
     some_failed = False
     meshes = []
     for run in runs:
-        if run.is_failed():
+        if run.get_state().is_failed():
             some_failed = True
         meshes.extend(run.result(raise_on_failure=False).result(raise_on_failure=False))
         get_run_logger().info(meshes)
