@@ -291,12 +291,9 @@ def tile_stitching(
     some_failed = False
     meshes = []
     for run in runs:
-        if run.get_state().is_failed():
+        if run.result(raise_on_failure=False).get_state().is_failed():
             some_failed = True
         meshes.extend(run.result(raise_on_failure=False).result(raise_on_failure=False))
-        get_run_logger().info(meshes)
-
-    get_run_logger().info(meshes)
 
     runs = []
     for batch_number, i in enumerate(range(0, len(meshes), batch_size)):
