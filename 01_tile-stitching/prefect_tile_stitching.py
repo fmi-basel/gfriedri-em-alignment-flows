@@ -291,7 +291,7 @@ def tile_stitching(
     some_failed = False
     meshes = []
     for run in runs:
-        if run.result(raise_on_failure=False).get_state().is_failed():
+        if run.result(raise_on_failure=False).is_failed():
             some_failed = True
         meshes.extend(run.result(raise_on_failure=False).result(raise_on_failure=False))
 
