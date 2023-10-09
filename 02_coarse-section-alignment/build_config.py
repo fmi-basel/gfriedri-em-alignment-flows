@@ -5,11 +5,11 @@ import yaml
 def build_config():
     config_option = questionary.select(
         "Build config for:",
-        choices=["shift-computation", "coarse-stack"],
-        default="shift-computation",
+        choices=["coarse-align", "coarse-stack"],
+        default="coarse-align",
     ).ask()
 
-    if config_option == "shift-computation":
+    if config_option == "coarse-align":
         user_name = questionary.text("User name:").ask()
         stitched_sections_dir = questionary.path(
             "Path to the stitched sections " "directory:"
