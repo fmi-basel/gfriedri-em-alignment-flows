@@ -79,7 +79,7 @@ def create_zarr(
 
     datasets = []
     shapes = []
-    for path, level in enumerate(range(4)):
+    for path, level in enumerate(range(5)):
         downscale = 2**level
         # Downscale only in YX
         shape = (
