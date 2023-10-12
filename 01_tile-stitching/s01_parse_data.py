@@ -20,9 +20,6 @@ def parse_data(
     tile_grid: str,
     thickness: float,
     resolution_xy: float,
-    tile_width: int,
-    tile_height: int,
-    tile_overlap: int,
     start_section: int,
     end_section: int,
 ):
@@ -52,12 +49,21 @@ def parse_data(
                     section_num=tile_spec["z"],
                     tile_grid_num=tile_grid_num,
                     thickness=thickness,
-                    tile_height=tile_height,
-                    tile_width=tile_width,
-                    tile_overlap=tile_overlap,
+                    tile_height=tile_spec["tile_height"],
+                    tile_width=tile_spec["tile_width"],
+                    tile_overlap=tile_spec["overlap"],
                 )
                 sections[section_name] = section
 
+            assert (
+                tile_spec["tile_height"] == section.get_tile_height()
+            ), f"Tile height is off in section {section.get_name()}."
+            assert (
+                tile_spec["tile_width"] == section.get_tile_width()
+            ), f"Tile width is off in section {section.get_name()}."
+            assert (
+                tile_spec["overlap"] == section.get_tile_overlap()
+            ), f"Tile overlap is off in section {section.get_name()}."
             Tile(
                 section,
                 tile_id=tile_spec["tile_id"],
@@ -93,15 +99,13 @@ def main(
         tile_grid=acquisition_conf.tile_grid,
         thickness=acquisition_conf.thickness,
         resolution_xy=acquisition_conf.resolution_xy,
-        tile_width=acquisition_conf.tile_width,
-        tile_height=acquisition_conf.tile_height,
-        tile_overlap=acquisition_conf.tile_overlap,
         start_section=start_section,
         end_section=end_section,
     )
 
 
 if __name__ == "__main__":
+
     main(
         section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
         sbem_root_dir="/tungstenfs/scratch/gmicro/prefect-test/gfriedri-em"

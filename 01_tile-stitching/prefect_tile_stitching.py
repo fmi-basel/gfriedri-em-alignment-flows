@@ -43,9 +43,6 @@ def parse_data_task(
         tile_grid=acquisition_conf.tile_grid,
         thickness=acquisition_conf.thickness,
         resolution_xy=acquisition_conf.resolution_xy,
-        tile_width=acquisition_conf.tile_width,
-        tile_height=acquisition_conf.tile_height,
-        tile_overlap=acquisition_conf.tile_overlap,
         start_section=start_section,
         end_section=end_section,
     )
