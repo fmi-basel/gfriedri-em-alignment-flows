@@ -116,10 +116,11 @@ def coarse_alignment(
     runs = []
     for i in range(0, len(section_dirs), batch_size):
         start = max(0, i - 1)
+        end = i + batch_size
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Pair-wise Coarse Align/{user}",
-                parameters=dict(section_dirs=section_dirs[start : start + batch_size]),
+                parameters=dict(section_dirs=section_dirs[start:end]),
             )
         )
 

@@ -4,9 +4,9 @@ from os.path import basename, join
 import numpy as np
 import zarr
 from numcodecs import Blosc
+from ome_zarr.format import CurrentFormat
 from ome_zarr.io import parse_url
 from ome_zarr.scale import Scaler
-from ome_zarr.writer import write_image
 from s01_coarse_align_section_pairs import list_zarr_sections
 from skimage.measure import block_reduce
 from tqdm import tqdm
@@ -77,21 +77,48 @@ def create_zarr(
     store = parse_url(target_dir, mode="w").store
     zarr_root = zarr.group(store=store)
 
-    chunks = (1, 2744, 2744)
-    write_image(
-        image=np.zeros(
-            (end_section - start_section, yx_size[0] // bin, yx_size[1] // bin),
-            dtype=np.uint8,
-        ),
-        group=zarr_root,
-        axes="zyx",
-        scaler=Scaler(max_layer=4),
-        storage_options=dict(
-            chunks=chunks,
+    datasets = []
+    shapes = []
+    for path, level in enumerate(range(4)):
+        downscale = 2**level
+        # Downscale only in YX
+        shape = (
+            end_section - start_section,
+            yx_size[0] // bin // downscale,
+            yx_size[1] // bin // downscale,
+        )
+        zarr_root.create_dataset(
+            name=str(path),
+            shape=shape,
+            chunks=(1, 2744, 2744),
             compressor=Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE),
             overwrite=True,
             write_empty_chunks=False,
-        ),
+            fill_value=0,
+            dtype=np.uint8,
+            dimension_separator="/",
+        )
+
+        datasets.append({"path": str(path)})
+        shapes.append(shape)
+
+    fmt = CurrentFormat()
+    coordinate_transformations = fmt.generate_coordinate_transformations(shapes)
+
+    fmt.validate_coordinate_transformations(
+        ndim=3,
+        nlevels=len(shapes),
+        coordinate_transformations=coordinate_transformations,
+    )
+    for dataset, transform in zip(datasets, coordinate_transformations):
+        dataset["coordinateTransformations"] = transform
+
+    from ome_zarr import writer
+
+    writer.write_multiscales_metadata(
+        group=zarr_root,
+        datasets=datasets,
+        axes="zyx",
     )
 
     return target_dir
