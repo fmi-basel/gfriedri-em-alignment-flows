@@ -305,27 +305,6 @@ def get_acquistion_config():
             validate=lambda v: v.replace(".", "").isdigit(),
         ).ask()
     )
-    tile_width = int(
-        questionary.text(
-            "sbem_config.Tile width:",
-            default="3072",
-            validate=lambda v: v.isdigit(),
-        ).ask()
-    )
-    tile_height = int(
-        questionary.text(
-            "sbem_config.Tile height:",
-            default="2304",
-            validate=lambda v: v.isdigit(),
-        ).ask()
-    )
-    tile_overlap = int(
-        questionary.text(
-            "sbem_config.Tile overlap:",
-            default="200",
-            validate=lambda v: v.isdigit(),
-        ).ask()
-    )
 
     return AcquisitionConfig(
         sbem_root_dir=sbem_root_dir,
@@ -333,9 +312,6 @@ def get_acquistion_config():
         tile_grid=tile_grid,
         thickness=thickness,
         resolution_xy=resolution_xy,
-        tile_width=tile_width,
-        tile_height=tile_height,
-        tile_overlap=tile_overlap,
     )
 
 

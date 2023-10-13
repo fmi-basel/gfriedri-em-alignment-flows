@@ -7,9 +7,6 @@ class AcquisitionConfig(BaseModel):
     tile_grid: str = "g0001"
     thickness: float = 25
     resolution_xy: float = 11
-    tile_width: int = 3072
-    tile_height: int = 2304
-    tile_overlap: int = 220
 
 
 class MeshIntegrationConfig(BaseModel):
