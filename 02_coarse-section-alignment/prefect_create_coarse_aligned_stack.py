@@ -170,7 +170,7 @@ def create_coarse_stack(
         bin=bin,
     )
 
-    batch_size = int(max(10, min(len(filtered_section_dirs) // max_parallel_jobs, 500)))
+    batch_size = int(max(10, min(len(filtered_section_dirs) // max_parallel_jobs, 100)))
     n_jobs = len(filtered_section_dirs) // batch_size + 1
     batch_size = len(filtered_section_dirs) // n_jobs
 
