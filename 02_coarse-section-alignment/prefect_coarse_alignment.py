@@ -1,12 +1,17 @@
-from os.path import basename
+import json
+from os.path import basename, join
 
 from prefect import flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
-from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
-from s01_coarse_align_section_pairs import compute_shift, list_zarr_sections
+from s01_coarse_align_section_pairs import (
+    compute_shift,
+    get_padding_per_section,
+    list_zarr_sections,
+    load_shifts,
+)
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 
@@ -72,6 +77,22 @@ def compute_shift_task(
     )
 
 
+@task(
+    name="compute-padding",
+    refresh_cache=True,
+    persist_result=True,
+    result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
+)
+def compute_padding(section_dirs):
+    shifts = load_shifts(section_dirs)
+    paddings = get_padding_per_section(shifts)
+    for i in range(len(section_dirs)):
+        with open(join(section_dirs[i], "coarse_stack_padding.json"), "w") as f:
+            json.dump(dict(shift_y=int(paddings[i, 0]), shift_x=int(paddings[i, 1])), f)
+
+
 @flow(
     name="[SOFIMA] Pair-wise Coarse Align",
     persist_result=True,
@@ -128,19 +149,10 @@ def coarse_alignment(
             )
         )
 
-    some_failed = False
-    results = []
     for run in runs:
-        if run.result(raise_on_failure=False).is_failed():
-            some_failed = True
-        results.extend(
-            run.result(raise_on_failure=False).result(raise_on_failure=False)
-        )
+        run.result(raise_on_failure=True)
 
-    if some_failed:
-        return Failed()
-    else:
-        return Completed()
+    compute_padding(section_dirs)
 
 
 if __name__ == "__main__":

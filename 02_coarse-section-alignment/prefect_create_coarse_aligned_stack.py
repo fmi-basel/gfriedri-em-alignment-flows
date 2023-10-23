@@ -7,27 +7,9 @@ from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from prefect_coarse_alignment import list_zarr_sections_task, submit_flowrun
-from s02_create_coarse_aligned_stack import (
-    create_zarr,
-    get_padding_per_section,
-    load_shifts,
-    write_section,
-)
+from s02_create_coarse_aligned_stack import create_zarr, write_section
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
-
-
-@task(
-    name="load-shifts",
-    refresh_cache=True,
-    persist_result=True,
-    result_storage_key=RESULT_STORAGE_KEY,
-    cache_result_in_memory=False,
-    cache_key_fn=task_input_hash,
-)
-def compute_padding_task(section_dirs: list[str]):
-    shifts = load_shifts(section_dirs=section_dirs)
-    return get_padding_per_section(shifts=shifts)
 
 
 @task(
@@ -67,7 +49,6 @@ def create_zarr_task(
 )
 def write_section_task(
     section_dir: str,
-    padding,
     start_section: int,
     yx_start: tuple[int, int],
     yx_size: tuple[int, int],
@@ -77,7 +58,6 @@ def write_section_task(
 ):
     write_section(
         section_dir=section_dir,
-        padding=padding,
         start_section=start_section,
         yx_start=yx_start,
         yx_size=yx_size,
@@ -94,8 +74,6 @@ def write_section_task(
 )
 def write_coarse_aligned_sections(
     section_dirs: list[str],
-    index: int,
-    batch_size: int,
     zarr_path: str,
     start_section: int,
     yx_start: tuple[int, int],
@@ -105,14 +83,9 @@ def write_coarse_aligned_sections(
     store = parse_url(zarr_path, mode="w").store
     zarr_root = zarr.group(store=store)
 
-    section_paddings = compute_padding_task(
-        section_dirs=section_dirs,
-    )
-
-    for i in range(index, min(index + batch_size, len(section_dirs))):
+    for i in range(len(section_dirs)):
         write_section_task(
             section_dir=section_dirs[i],
-            padding=section_paddings[i],
             start_section=start_section,
             yx_start=yx_start,
             yx_size=yx_size,
@@ -181,8 +154,6 @@ def create_coarse_stack(
                 flow_name=f"[SOFIMA] Write Coarse Aligned Sections/{user}",
                 parameters=dict(
                     section_dirs=filtered_section_dirs[i : i + batch_size],
-                    index=i,
-                    batch_size=batch_size,
                     zarr_path=empty_zarr_path,
                     start_section=start_section,
                     yx_start=yx_start,
@@ -194,13 +165,9 @@ def create_coarse_stack(
         )
 
     some_failed = False
-    results = []
     for run in runs:
         if run.result(raise_on_failure=False).is_failed():
             some_failed = True
-        results.extend(
-            run.result(raise_on_failure=False).result(raise_on_failure=False)
-        )
 
     if some_failed:
         return Failed()
