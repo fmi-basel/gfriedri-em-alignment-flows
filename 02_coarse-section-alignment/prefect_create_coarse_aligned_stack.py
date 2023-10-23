@@ -170,7 +170,7 @@ def create_coarse_stack(
         bin=bin,
     )
 
-    batch_size = int(max(10, min(len(filtered_section_dirs) // max_parallel_jobs, 100)))
+    batch_size = int(max(10, min(len(filtered_section_dirs) // max_parallel_jobs, 500)))
     n_jobs = len(filtered_section_dirs) // batch_size + 1
     batch_size = len(filtered_section_dirs) // n_jobs
 
@@ -180,7 +180,7 @@ def create_coarse_stack(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Write Coarse Aligned Sections/{user}",
                 parameters=dict(
-                    section_dirs=filtered_section_dirs,
+                    section_dirs=filtered_section_dirs[i : i + batch_size],
                     index=i,
                     batch_size=batch_size,
                     zarr_path=empty_zarr_path,
