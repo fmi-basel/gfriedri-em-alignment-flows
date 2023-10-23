@@ -3,6 +3,7 @@ from os.path import basename
 from prefect import flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
+from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from s01_coarse_align_section_pairs import compute_shift, list_zarr_sections
@@ -21,7 +22,7 @@ def filter(section_dirs: list[str], start_section: int, end_section: int):
 
 
 @task(
-    task_run_name="submit flow-run: {flow_name}",
+    task_run_name="submit flow-run-{flow_name}-{batch}",
     persist_result=True,
     result_storage_key="{flow_run.name}/submit flow-run/{task_run.id}.json",
     cache_result_in_memory=False,
@@ -30,12 +31,13 @@ def filter(section_dirs: list[str], start_section: int, end_section: int):
 def submit_flowrun(
     flow_name: str,
     parameters: dict,
+    batch: int,
 ):
     run: FlowRun = run_deployment(
         name=flow_name,
         parameters=parameters,
     )
-    return run.state.result()
+    return run.state
 
 
 @task(
@@ -114,15 +116,31 @@ def coarse_alignment(
     batch_size = len(section_dirs) // n_jobs
 
     runs = []
-    for i in range(0, len(section_dirs), batch_size):
+    for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
         start = max(0, i - 1)
         end = i + batch_size
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Pair-wise Coarse Align/{user}",
                 parameters=dict(section_dirs=section_dirs[start:end]),
+                batch=batch_number,
+                return_state=False,
             )
         )
+
+    some_failed = False
+    results = []
+    for run in runs:
+        if run.result(raise_on_failure=False).is_failed():
+            some_failed = True
+        results.extend(
+            run.result(raise_on_failure=False).result(raise_on_failure=False)
+        )
+
+    if some_failed:
+        return Failed()
+    else:
+        return Completed()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from os.path import basename
 import zarr
 from ome_zarr.io import parse_url
 from prefect import flow, get_run_logger, task
+from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from prefect_coarse_alignment import list_zarr_sections_task, submit_flowrun
@@ -57,7 +58,7 @@ def create_zarr_task(
 
 @task(
     name="write-section",
-    task_run_name="write-section: {section_name}",
+    task_run_name="write-section-{section_name}",
     refresh_cache=True,
     persist_result=True,
     result_storage_key=RESULT_STORAGE_KEY,
@@ -174,7 +175,7 @@ def create_coarse_stack(
     batch_size = len(filtered_section_dirs) // n_jobs
 
     runs = []
-    for i in range(0, len(filtered_section_dirs), batch_size):
+    for batch_number, i in enumerate(range(0, len(filtered_section_dirs), batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Write Coarse Aligned Sections/{user}",
@@ -188,8 +189,23 @@ def create_coarse_stack(
                     yx_size=yx_size,
                     bin=bin,
                 ),
+                batch=batch_number,
             )
         )
+
+    some_failed = False
+    results = []
+    for run in runs:
+        if run.result(raise_on_failure=False).is_failed():
+            some_failed = True
+        results.extend(
+            run.result(raise_on_failure=False).result(raise_on_failure=False)
+        )
+
+    if some_failed:
+        return Failed()
+    else:
+        return Completed()
 
 
 if __name__ == "__main__":
