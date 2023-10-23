@@ -135,6 +135,23 @@ def compute_shift(current_section_dir: str, next_section_dir: str):
         json.dump(dict(shift_y=int(shift_y), shift_x=int(shift_x)), f)
 
 
+def load_shifts(section_dirs: list[str]):
+    shifts = []
+    for sec in section_dirs[1:]:
+        with open(join(sec, "shift_to_previous.json")) as f:
+            data = json.load(f)
+            shifts.append([data["shift_y"], data["shift_x"]])
+
+    return np.array(shifts)
+
+
+def get_padding_per_section(shifts):
+    cumulated_shifts = np.cumsum(shifts, axis=0)
+    cumulated_shifts = np.concatenate([np.array([[0, 0]]), cumulated_shifts], 0)
+    cumulated_padding = cumulated_shifts + np.abs(np.min(cumulated_shifts, axis=0))
+    return cumulated_padding
+
+
 def main(stitched_section_dir: str):
     section_dirs = list_zarr_sections(
         root_dir=stitched_section_dir,
@@ -144,6 +161,12 @@ def main(stitched_section_dir: str):
         compute_shift(
             current_section_dir=section_dirs[i], next_section_dir=section_dirs[i + 1]
         )
+
+    shifts = load_shifts(section_dirs)
+    paddings = get_padding_per_section(shifts)
+    for i in tqdm(range(len(section_dirs))):
+        with open(join(section_dirs[i], "coarse_stack_padding.json"), "w") as f:
+            json.dump(dict(shift_y=int(paddings[i, 0]), shift_x=int(paddings[i, 1])), f)
 
 
 if __name__ == "__main__":

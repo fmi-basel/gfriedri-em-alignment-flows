@@ -1,11 +1,17 @@
-from os.path import basename
+import json
+from os.path import basename, join
 
 from prefect import flow, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
-from s01_coarse_align_section_pairs import compute_shift, list_zarr_sections
+from s01_coarse_align_section_pairs import (
+    compute_shift,
+    get_padding_per_section,
+    list_zarr_sections,
+    load_shifts,
+)
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 
@@ -21,7 +27,7 @@ def filter(section_dirs: list[str], start_section: int, end_section: int):
 
 
 @task(
-    task_run_name="submit flow-run: {flow_name}",
+    task_run_name="submit flow-run-{flow_name}-{batch}",
     persist_result=True,
     result_storage_key="{flow_run.name}/submit flow-run/{task_run.id}.json",
     cache_result_in_memory=False,
@@ -30,12 +36,13 @@ def filter(section_dirs: list[str], start_section: int, end_section: int):
 def submit_flowrun(
     flow_name: str,
     parameters: dict,
+    batch: int,
 ):
     run: FlowRun = run_deployment(
         name=flow_name,
         parameters=parameters,
     )
-    return run.state.result()
+    return run.state
 
 
 @task(
@@ -68,6 +75,22 @@ def compute_shift_task(
         current_section_dir=current_section_dir,
         next_section_dir=next_section_dir,
     )
+
+
+@task(
+    name="compute-padding",
+    refresh_cache=True,
+    persist_result=True,
+    result_storage_key=RESULT_STORAGE_KEY,
+    cache_result_in_memory=False,
+    cache_key_fn=task_input_hash,
+)
+def compute_padding(section_dirs):
+    shifts = load_shifts(section_dirs)
+    paddings = get_padding_per_section(shifts)
+    for i in range(len(section_dirs)):
+        with open(join(section_dirs[i], "coarse_stack_padding.json"), "w") as f:
+            json.dump(dict(shift_y=int(paddings[i, 0]), shift_x=int(paddings[i, 1])), f)
 
 
 @flow(
@@ -114,15 +137,22 @@ def coarse_alignment(
     batch_size = len(section_dirs) // n_jobs
 
     runs = []
-    for i in range(0, len(section_dirs), batch_size):
+    for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
         start = max(0, i - 1)
         end = i + batch_size
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Pair-wise Coarse Align/{user}",
                 parameters=dict(section_dirs=section_dirs[start:end]),
+                batch=batch_number,
+                return_state=False,
             )
         )
+
+    for run in runs:
+        run.result(raise_on_failure=True)
+
+    compute_padding(section_dirs)
 
 
 if __name__ == "__main__":

@@ -12,26 +12,17 @@ from skimage.measure import block_reduce
 from tqdm import tqdm
 
 
-def load_shifts(section_dirs: list[str]):
-    shifts = []
-    for sec in section_dirs[1:]:
-        with open(join(sec, "shift_to_previous.json")) as f:
-            data = json.load(f)
-            shifts.append([data["shift_y"], data["shift_x"]])
+def load_padding(section_dir: str) -> tuple[int, int]:
+    with open(join(section_dir, "coarse_stack_padding.json")) as f:
+        config = json.load(f)
+        shift_y = config["shift_y"]
+        shift_x = config["shift_x"]
 
-    return np.array(shifts)
-
-
-def get_padding_per_section(shifts):
-    cumulated_shifts = np.cumsum(shifts, axis=0)
-    cumulated_shifts = np.concatenate([np.array([[0, 0]]), cumulated_shifts], 0)
-    cumulated_padding = cumulated_shifts + np.abs(np.min(cumulated_shifts, axis=0))
-    return cumulated_padding
+    return shift_y, shift_x
 
 
 def write_section(
     section_dir: str,
-    padding,
     start_section: int,
     yx_start: tuple[int, int],
     yx_size: tuple[int, int],
@@ -42,7 +33,7 @@ def write_section(
     sec_id = int(basename(section_dir).split("_")[0][1:])
     output_index = sec_id - start_section
     current = zarr.Group(parse_url(section_dir).store)
-    y_pad, x_pad = padding
+    y_pad, x_pad = load_padding(section_dir)
     data = block_reduce(
         current[0][
             yx_start[0] : yx_start[0] + yx_size[0] - y_pad,
@@ -140,10 +131,6 @@ def main(
         root_dir=stitched_section_dir,
     )
 
-    shifts = load_shifts(section_dirs=section_dirs)
-
-    section_paddings = get_padding_per_section(shifts)
-
     zarr_path = create_zarr(
         output_dir=output_dir,
         volume_name=volume_name,
@@ -161,7 +148,6 @@ def main(
         if start_section <= sec_id < end_section:
             write_section(
                 section_dir=section_dirs[i],
-                padding=section_paddings[i],
                 start_section=start_section,
                 yx_start=yx_start,
                 yx_size=yx_size,
