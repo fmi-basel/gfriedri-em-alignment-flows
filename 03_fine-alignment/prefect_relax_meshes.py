@@ -88,11 +88,11 @@ def relax_meshes_flow(
     create_map_storage(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
-        n_sections=len(section_dirs),
+        n_sections=len(section_dirs) + 1,
         block_size=integration_config.block_size,
     )
 
-    chunk_factor = 400 // integration_config.block_size
+    chunk_factor = 100 // integration_config.block_size
     chunk_size = chunk_factor * integration_config.block_size
     runs = []
     for i, chunk_start in enumerate(range(0, len(section_dirs), chunk_size)):

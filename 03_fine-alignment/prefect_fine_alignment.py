@@ -11,6 +11,7 @@ from s01_estimate_flow_fields import (
     clean_flow,
     compute_final_flow,
     filter_sections,
+    get_yx_size,
     list_zarr_sections,
     load_section_data,
 )
@@ -33,6 +34,7 @@ def estimate_z_flow_fields(
     stitched_sections_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
+    yx_size: tuple[int, int] = (10, 10),
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
     logger = get_run_logger()
@@ -48,12 +50,14 @@ def estimate_z_flow_fields(
 
     previous_name = section_name(section_dirs[0])
     logger.info(f"Load section {previous_name}.")
-    previous_section = load_section_data(section_dir=section_dirs[0])
+    previous_section = load_section_data(section_dir=section_dirs[0], yx_size=yx_size)
 
     for i in range(1, len(section_dirs)):
         current_name = section_name(section_dirs[i])
         logger.info(f"Load section {current_name}.")
-        current_section = load_section_data(section_dir=section_dirs[i])
+        current_section = load_section_data(
+            section_dir=section_dirs[i], yx_size=yx_size
+        )
 
         logger.info(
             f"Compute flow-field between {previous_name} and " f"{current_name}."
@@ -149,6 +153,14 @@ def estimate_z_flow_fields_parallel(
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
     max_parallel_jobs: int = 10,
 ):
+    section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
+    section_dirs = filter_sections(
+        section_dirs=section_dirs, start_section=start_section, end_section=end_section
+    )
+
+    yx_size = get_yx_size(section_dirs, bin=1)
+    get_run_logger().info(f"Computed yx_size = ({yx_size[0]}, {yx_size[1]}).")
+
     n_sections = end_section - start_section
     batch_size = int(max(10, min(n_sections // max_parallel_jobs, 250)))
     n_jobs = n_sections // batch_size + 1
@@ -163,6 +175,7 @@ def estimate_z_flow_fields_parallel(
                     stitched_sections_dir=stitched_sections_dir,
                     start_section=max(start_section, i - 1),
                     end_section=min(i + batch_size, end_section),
+                    yx_size=yx_size,
                     ffe_conf=ffe_conf,
                 ),
                 batch=batch_number,

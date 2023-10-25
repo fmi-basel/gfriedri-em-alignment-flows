@@ -1,6 +1,6 @@
 import logging
 from glob import glob
-from os.path import join
+from os.path import basename, join, splitext
 
 import jax.numpy as jnp
 import numpy as np
@@ -11,6 +11,10 @@ from ome_zarr.io import parse_url
 from parameter_config import MeshIntegrationConfig
 from s01_estimate_flow_fields import filter_sections, list_zarr_sections
 from sofima import map_utils, mesh
+
+
+def section_name(dir: str) -> str:
+    return splitext(basename(dir))[0]
 
 
 def create_map_storage(
@@ -114,7 +118,6 @@ def mesh_optimization(
             final_flow.append(np.load(ff_path[0]))
 
     final_flow = np.concatenate(final_flow, axis=1)
-
     origin = jnp.array([0.0, 0.0])
 
     solved = map_zarr["main"]
@@ -133,7 +136,7 @@ def mesh_optimization(
             stride,
         )
         x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
-        logger.info(f"Relaxing mesh for section {start_section + z + 1}.")
+        logger.info(f"Relaxing {z + 1} mesh in block.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
@@ -165,7 +168,9 @@ def relax_meshes_in_blocks(
     ):
         start = i
         end = min(start + integration_config.block_size, len(section_dirs))
-        logger.info(f"Optimize meshes in block [{start}:{end}).")
+        start_name = section_name(section_dirs[start])
+        end_name = section_name(section_dirs[end - 1])
+        logger.info(f"Optimize meshes in block [{start_name}:{end_name}].")
         mesh_optimization(
             section_dirs=section_dirs[start:end],
             start_section=start,
@@ -260,7 +265,7 @@ def relax_meshes(
     create_map_storage(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
-        n_sections=len(section_dirs),
+        n_sections=len(section_dirs) + 1,
         block_size=integration_config.block_size,
     )
 
@@ -275,6 +280,7 @@ def relax_meshes(
         output_dir=output_dir,
         integration_config=integration_config,
         flow_stride=flow_stride,
+        logger=logging.Logger("relax meshes"),
     )
 
 
