@@ -30,13 +30,13 @@ def section_name(dir: str) -> str:
     cache_result_in_memory=False,
 )
 def estimate_z_flow_fields(
-    stitched_section_dir: str = "",
+    stitched_sections_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
     logger = get_run_logger()
-    section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
+    section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
     section_dirs = filter_sections(
         section_dirs=section_dirs,
         start_section=start_section,
@@ -143,7 +143,7 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
 )
 def estimate_z_flow_fields_parallel(
     user: str = "",
-    stitched_section_dir: str = "",
+    stitched_sections_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
@@ -160,7 +160,7 @@ def estimate_z_flow_fields_parallel(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",
                 parameters=dict(
-                    stitched_section_dir=stitched_section_dir,
+                    stitched_sections_dir=stitched_sections_dir,
                     start_section=max(start_section, i - 1),
                     end_section=min(i + batch_size, end_section),
                     ffe_conf=ffe_conf,
