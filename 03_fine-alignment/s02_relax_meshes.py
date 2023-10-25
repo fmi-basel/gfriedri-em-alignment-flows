@@ -109,8 +109,9 @@ def mesh_optimization(
     )
     final_flow = []
     for section in section_dirs:
-        ff_path = glob(join(section, "final_flow_*.npy"))[0]
-        final_flow.append(np.load(ff_path))
+        ff_path = glob(join(section, "final_flow_*.npy"))
+        if len(ff_path) > 0:
+            final_flow.append(np.load(ff_path[0]))
 
     origin = jnp.array([0.0, 0.0])
 
