@@ -113,6 +113,8 @@ def mesh_optimization(
         if len(ff_path) > 0:
             final_flow.append(np.load(ff_path[0]))
 
+    final_flow = np.concatenate(final_flow, axis=1)
+
     origin = jnp.array([0.0, 0.0])
 
     solved = map_zarr["main"]
