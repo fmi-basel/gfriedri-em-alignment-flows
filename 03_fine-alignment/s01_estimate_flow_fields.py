@@ -1,5 +1,8 @@
 import json
+import os
+import re
 from os.path import basename, join, splitext
+from pathlib import Path
 
 import numpy as np
 import zarr
@@ -7,16 +10,40 @@ from connectomics.common import bounding_box
 from numpy._typing import ArrayLike
 from ome_zarr.io import parse_url
 from parameter_config import FlowFieldEstimationConfig
-from s01_accumulate_section_paddings import filter, list_zarr_sections
 from skimage.measure import block_reduce
 from sofima import flow_field, flow_utils, map_utils
 
 
+def filter_sections(section_dirs: list[str], start_section: int, end_section: int):
+    kept = []
+    for sec in section_dirs:
+        sec_idx = int(basename(sec).split("_")[0][1:])
+        if start_section <= sec_idx <= end_section:
+            kept.append(sec)
+
+    return kept
+
+
+def list_zarr_sections(root_dir: str) -> list[str]:
+    filename_re = re.compile(r"s[0-9]*_g[0-9]*.zarr")
+    files = []
+    root, dirs, _ = next(os.walk(root_dir))
+    for d in dirs:
+        m_filename = filename_re.fullmatch(d)
+        if m_filename:
+            files.append(str(Path(root).joinpath(d)))
+
+    files.sort(key=lambda v: int(basename(v).split("_")[0][1:]))
+    return files
+
+
 def load_section_data(section_dir: str) -> ArrayLike:
-    with open(join(section_dir, "padding.json")) as f:
-        padding = np.array(json.load(f))
+    with open(join(section_dir, "coarse_stack_padding.json")) as f:
+        config = json.load(f)
+        pad_y = config["shift_y"]
+        pad_x = config["shift_x"]
     data = zarr.Group(parse_url(section_dir).store)[0][:]
-    return np.pad(data, pad_width=((padding[0], 0), (padding[1], 0)))
+    return np.pad(data, pad_width=((pad_y, 0), (pad_x, 0)))
 
 
 def clean_flow(
@@ -83,7 +110,7 @@ def estimate_flow_fields(
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
-    section_dirs = filter(
+    section_dirs = filter_sections(
         section_dirs=section_dirs, start_section=start_section, end_section=end_section
     )
 
