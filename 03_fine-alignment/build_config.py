@@ -91,7 +91,7 @@ def build_config():
             max_deviation=max_deviation,
             max_gradient=max_gradient,
             min_patch_size=min_patch_size,
-        ),
+        ).dict(),
         max_parallel_jobs=10,
     )
 
