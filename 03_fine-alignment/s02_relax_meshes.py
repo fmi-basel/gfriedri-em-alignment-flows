@@ -136,7 +136,7 @@ def mesh_optimization(
             stride,
         )
         x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
-        logger.info(f"Relaxing {z + 1} mesh in block.")
+        logger.info(f"Relaxing {z + 1}. mesh in block.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
