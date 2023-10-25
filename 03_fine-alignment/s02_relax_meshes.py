@@ -18,7 +18,7 @@ def create_map_storage(
     shape: tuple[int, int],
     n_sections: int,
     block_size: int,
-):
+) -> zarr.Group:
     store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
     map_zarr: zarr.Group = zarr.group(store=store)
 
