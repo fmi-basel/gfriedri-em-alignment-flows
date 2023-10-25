@@ -14,6 +14,35 @@ from skimage.measure import block_reduce
 from sofima import flow_field, flow_utils, map_utils
 
 
+def get_yx_size(section_dirs: list[str], bin: int = 1):
+
+    max_size_y = 0
+    max_size_x = 0
+    for sec_dir in section_dirs:
+        with open(join(sec_dir, "0", ".zarray")) as f:
+            shape = json.load(f)["shape"]
+
+        with open(join(sec_dir, "coarse_stack_padding.json")) as f:
+            shifts = json.load(f)
+            shift_y = shifts["shift_y"]
+            shift_x = shifts["shift_x"]
+
+        size_y = shape[0] + shift_y
+        size_x = shape[1] + shift_x
+        if size_y > max_size_y:
+            max_size_y = size_y
+        if size_x > max_size_x:
+            max_size_x = size_x
+
+    max_size_y = max_size_y - max_size_y % bin
+    max_size_x = max_size_x - max_size_x % bin
+
+    assert max_size_y % bin == 0, "yx_size must be divisible by bin."
+    assert max_size_x % bin == 0, "yx_size must be divisible by bin."
+
+    return max_size_y, max_size_x
+
+
 def filter_sections(section_dirs: list[str], start_section: int, end_section: int):
     kept = []
     for sec in section_dirs:
@@ -37,13 +66,18 @@ def list_zarr_sections(root_dir: str) -> list[str]:
     return files
 
 
-def load_section_data(section_dir: str) -> ArrayLike:
+def load_section_data(section_dir: str, yx_size: tuple[int, int]) -> ArrayLike:
     with open(join(section_dir, "coarse_stack_padding.json")) as f:
         config = json.load(f)
         pad_y = config["shift_y"]
         pad_x = config["shift_x"]
-    data = zarr.Group(parse_url(section_dir).store)[0][:]
-    return np.pad(data, pad_width=((pad_y, 0), (pad_x, 0)))
+
+    zarray = zarr.Group(parse_url(section_dir).store)[0]
+
+    data = np.zeros(yx_size, dtype=zarray.dtype)
+    data[pad_y : pad_y + zarray.shape[0], pad_x : pad_x + zarray.shape[1]] = zarray[:]
+
+    return data
 
 
 def clean_flow(
@@ -114,16 +148,20 @@ def estimate_flow_fields(
         section_dirs=section_dirs, start_section=start_section, end_section=end_section
     )
 
+    yx_size = get_yx_size(section_dirs, bin=1)
+
     mfc = flow_field.JAXMaskedXCorrWithStatsCalculator()
 
     previous_section = load_section_data(
         section_dir=section_dirs[0],
+        yx_size=yx_size,
     )
     previous_name = splitext(basename(section_dirs[0]))[0]
 
     for i in range(1, len(section_dirs)):
         current_section = load_section_data(
             section_dir=section_dirs[i],
+            yx_size=yx_size,
         )
         current_name = splitext(basename(section_dirs[i]))[0]
 
