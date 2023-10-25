@@ -136,7 +136,7 @@ def mesh_optimization(
             stride,
         )
         x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
-        logger.info(f"Relaxing mesh for section {start_section + z + 1}.")
+        logger.info(f"Relaxing {z + 1} mesh in block.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
@@ -265,7 +265,7 @@ def relax_meshes(
     create_map_storage(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
-        n_sections=len(section_dirs),
+        n_sections=len(section_dirs) + 1,
         block_size=integration_config.block_size,
     )
 
@@ -280,6 +280,7 @@ def relax_meshes(
         output_dir=output_dir,
         integration_config=integration_config,
         flow_stride=flow_stride,
+        logger=logging.Logger("relax meshes"),
     )
 
 
