@@ -24,7 +24,6 @@ def load_padding(section_dir: str) -> tuple[int, int]:
 def write_section(
     section_dir: str,
     start_section: int,
-    yx_start: tuple[int, int],
     yx_size: tuple[int, int],
     bin: int,
     zarr_root: zarr.Group,
@@ -36,8 +35,8 @@ def write_section(
     y_pad, x_pad = load_padding(section_dir)
     data = block_reduce(
         current[0][
-            yx_start[0] : yx_start[0] + yx_size[0] - y_pad,
-            yx_start[1] : yx_start[1] + yx_size[1] - x_pad,
+            : yx_size[0] - y_pad,
+            : yx_size[1] - x_pad,
         ],
         block_size=bin,
         func=np.mean,
@@ -115,21 +114,48 @@ def create_zarr(
     return target_dir
 
 
+def get_yx_size(section_dirs: list[str], bin: int = 1):
+
+    max_size_y = 0
+    max_size_x = 0
+    for sec_dir in section_dirs:
+        with open(join(sec_dir, "0", ".zarray")) as f:
+            shape = json.load(f)["shape"]
+
+        with open(join(sec_dir, "coarse_stack_padding.json")) as f:
+            shifts = json.load(f)
+            shift_y = shifts["shift_y"]
+            shift_x = shifts["shift_x"]
+
+        size_y = shape[0] + shift_y
+        size_x = shape[1] + shift_x
+        if size_y > max_size_y:
+            max_size_y = size_y
+        if size_x > max_size_x:
+            max_size_x = size_x
+
+    max_size_y = max_size_y - max_size_y % bin
+    max_size_x = max_size_x - max_size_x % bin
+
+    assert max_size_y % bin == 0, "yx_size must be divisible by bin."
+    assert max_size_x % bin == 0, "yx_size must be divisible by bin."
+
+    return max_size_y, max_size_x
+
+
 def main(
     stitched_section_dir: str,
     output_dir: str,
     volume_name: str,
     start_section: int,
     end_section: int,
-    yx_start: tuple[int, int],
-    yx_size: tuple[int, int],
     bin: int,
 ):
-    assert yx_size[0] % bin == 0, "yx_size must be divisible by bin."
-    assert yx_size[1] % bin == 0, "yx_size must be divisible by bin."
     section_dirs = list_zarr_sections(
         root_dir=stitched_section_dir,
     )
+
+    yx_size = get_yx_size(section_dirs, bin=bin)
 
     zarr_path = create_zarr(
         output_dir=output_dir,
@@ -149,7 +175,6 @@ def main(
             write_section(
                 section_dir=section_dirs[i],
                 start_section=start_section,
-                yx_start=yx_start,
                 yx_size=yx_size,
                 bin=bin,
                 zarr_root=zarr_root,

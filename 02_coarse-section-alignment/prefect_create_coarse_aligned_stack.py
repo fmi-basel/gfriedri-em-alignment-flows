@@ -7,7 +7,7 @@ from prefect.states import Completed, Failed
 from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from prefect_coarse_alignment import list_zarr_sections_task, submit_flowrun
-from s02_create_coarse_aligned_stack import create_zarr, write_section
+from s02_create_coarse_aligned_stack import create_zarr, get_yx_size, write_section
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 
@@ -50,7 +50,6 @@ def create_zarr_task(
 def write_section_task(
     section_dir: str,
     start_section: int,
-    yx_start: tuple[int, int],
     yx_size: tuple[int, int],
     bin: int,
     zarr_root: zarr.Group,
@@ -59,7 +58,6 @@ def write_section_task(
     write_section(
         section_dir=section_dir,
         start_section=start_section,
-        yx_start=yx_start,
         yx_size=yx_size,
         bin=bin,
         zarr_root=zarr_root,
@@ -76,7 +74,6 @@ def write_coarse_aligned_sections(
     section_dirs: list[str],
     zarr_path: str,
     start_section: int,
-    yx_start: tuple[int, int],
     yx_size: tuple[int, int],
     bin: int,
 ):
@@ -87,7 +84,6 @@ def write_coarse_aligned_sections(
         write_section_task(
             section_dir=section_dirs[i],
             start_section=start_section,
-            yx_start=yx_start,
             yx_size=yx_size,
             bin=bin,
             zarr_root=zarr_root,
@@ -108,24 +104,17 @@ def create_coarse_stack(
     end_section: int = 10,
     output_dir: str = "",
     volume_name: str = "coarse_volume.zarr",
-    yx_start: tuple[int, int] = tuple([0, 0]),
-    yx_size: tuple[int, int] = tuple([4096, 4096]),
     bin: int = 2,
     max_parallel_jobs: int = 10,
 ):
-    assert (
-        yx_size[0] % bin == 0
-    ), f"yx_size[1]={yx_size[0]} is not divisible by bin={bin}."
-    assert (
-        yx_size[1] % bin == 0
-    ), f"yx_size[1]={yx_size[1]} is not divisible by bin={bin}."
-
     logger = get_run_logger()
 
     section_dirs = list_zarr_sections_task(
         root_dir=stitched_sections_dir,
     )
     logger.info(len(section_dirs))
+
+    yx_size = get_yx_size(section_dirs, bin=bin)
 
     filtered_section_dirs = []
     for sec in section_dirs:
@@ -156,7 +145,6 @@ def create_coarse_stack(
                     section_dirs=filtered_section_dirs[i : i + batch_size],
                     zarr_path=empty_zarr_path,
                     start_section=start_section,
-                    yx_start=yx_start,
                     yx_size=yx_size,
                     bin=bin,
                 ),
