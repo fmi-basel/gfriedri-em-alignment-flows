@@ -25,7 +25,7 @@ class MeshIntegrationConfig(BaseModel):
     start_cap: float = 0.01
     final_cap: float = 10
     prefer_orig_order: bool = True
-    block_size: int = 500
+    block_size: int = 50
 
 
 class WarpConfig(BaseModel):
