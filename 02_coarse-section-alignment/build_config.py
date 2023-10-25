@@ -63,26 +63,6 @@ def build_config():
 
         output_dir = questionary.text("Output dir:").ask()
         volume_name = questionary.text("Volume name:").ask()
-        yx_start = tuple(
-            int(i)
-            for i in questionary.text(
-                "YX start-coordinates:",
-                default="0,0",
-                validate=lambda v: v.replace(",", "").isdigit(),
-            )
-            .ask()
-            .split(",")
-        )
-        yx_size = tuple(
-            int(i)
-            for i in questionary.text(
-                "YX size:",
-                default="0,0",
-                validate=lambda v: v.replace(",", "").isdigit(),
-            )
-            .ask()
-            .split(",")
-        )
         bin = int(
             questionary.text(
                 "Bin factor:", default="2", validate=lambda v: v.isdigit()
@@ -96,8 +76,6 @@ def build_config():
             end_section=end_section,
             output_dir=output_dir,
             volume_name=volume_name,
-            yx_start=yx_start,
-            yx_size=yx_size,
             bin=bin,
             max_parallel_jobs=10,
         )

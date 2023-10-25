@@ -9,7 +9,7 @@ from connectomics.common import bounding_box
 from numcodecs import Blosc
 from ome_zarr.io import parse_url
 from parameter_config import MeshIntegrationConfig
-from s01_accumulate_section_paddings import filter, list_zarr_sections
+from s01_estimate_flow_fields import filter_sections, list_zarr_sections
 from sofima import map_utils, mesh
 
 
@@ -18,7 +18,7 @@ def create_map_storage(
     shape: tuple[int, int],
     n_sections: int,
     block_size: int,
-) -> zarr.Group:
+) -> None:
     store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
     map_zarr: zarr.Group = zarr.group(store=store)
 
@@ -83,8 +83,6 @@ def create_map_storage(
             overwrite=True,
         )
 
-    return map_zarr
-
 
 def mesh_optimization(
     section_dirs: list[str],
@@ -111,8 +109,11 @@ def mesh_optimization(
     )
     final_flow = []
     for section in section_dirs:
-        ff_path = glob(join(section, "final_flow_*.npy"))[0]
-        final_flow.append(np.load(ff_path))
+        ff_path = glob(join(section, "final_flow_*.npy"))
+        if len(ff_path) > 0:
+            final_flow.append(np.load(ff_path[0]))
+
+    final_flow = np.concatenate(final_flow, axis=1)
 
     origin = jnp.array([0.0, 0.0])
 
@@ -152,16 +153,19 @@ def mesh_optimization(
 
 def relax_meshes_in_blocks(
     section_dirs: list[str],
-    map_zarr: zarr.Group,
+    output_dir: str,
     integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
+    logger: logging.Logger = logging.getLogger("Relax Meshes"),
 ):
+    store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
+    map_zarr: zarr.Group = zarr.group(store=store)
     for block_index, i in enumerate(
         range(0, len(section_dirs), integration_config.block_size)
     ):
         start = i
         end = min(start + integration_config.block_size, len(section_dirs))
-
+        logger.info(f"Optimize meshes in block [{start}:{end}).")
         mesh_optimization(
             section_dirs=section_dirs[start:end],
             start_section=start,
@@ -169,12 +173,18 @@ def relax_meshes_in_blocks(
             map_zarr=map_zarr,
             stride=flow_stride,
             integration_config=integration_config,
+            logger=logger,
         )
 
 
 def relax_meshes_cross_blocks(
-    map_zarr: zarr.Group, integration_config: MeshIntegrationConfig, flow_stride: int
+    output_dir: str,
+    integration_config: MeshIntegrationConfig,
+    flow_stride: int,
+    logger: logging.Logger,
 ):
+    store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
+    map_zarr: zarr.Group = zarr.group(store=store)
     cross_block_flow = map_zarr["cross_block_flow"]
     cross_block_map = map_zarr["cross_block"]
     cross_block_inv_map = map_zarr["cross_block_inv"]
@@ -201,9 +211,11 @@ def relax_meshes_cross_blocks(
         final_cap=integration_config.final_cap,
         prefer_orig_order=integration_config.prefer_orig_order,
     )
+    logger.info(f"{x_block_flow.shape[1]} cross block flows to " f"solve.")
     origin = jnp.array([0.0, 0.0])
     xblk = []
     for z in range(x_block_flow.shape[1]):
+        logger.info(f"Solving cross block flow {z}.")
         if z == 0:
             prev = x_block_flow[:, z : z + 1, ...]
         else:
@@ -221,9 +233,11 @@ def relax_meshes_cross_blocks(
         xblk.append(x)
 
     xblk = np.concatenate(xblk, axis=1)
+    logger.info("Resample cross block map.")
     cross_block_map[:, :, ...] = map_utils.resample_map(
         xblk, map2x_box, map_box, flow_stride * 2, flow_stride
     )
+    logger.info("Invert cross block map.")
     cross_block_inv_map[:, :, ...] = map_utils.invert_map(
         cross_block_map[:], map_box, map_box, flow_stride
     )
@@ -238,12 +252,12 @@ def relax_meshes(
     flow_stride: int = 40,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
-    section_dirs = filter(
+    section_dirs = filter_sections(
         section_dirs=section_dirs, start_section=start_section, end_section=end_section
     )
 
     dummy_flow = np.load(glob(join(section_dirs[1], "final_flow_*.npy"))[0])
-    map_zarr = create_map_storage(
+    create_map_storage(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
         n_sections=len(section_dirs),
@@ -252,13 +266,13 @@ def relax_meshes(
 
     relax_meshes_in_blocks(
         section_dirs=section_dirs,
-        map_zarr=map_zarr,
+        output_dir=output_dir,
         integration_config=integration_config,
         flow_stride=flow_stride,
     )
 
     relax_meshes_cross_blocks(
-        map_zarr=map_zarr,
+        output_dir=output_dir,
         integration_config=integration_config,
         flow_stride=flow_stride,
     )
