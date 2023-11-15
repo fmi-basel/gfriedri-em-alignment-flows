@@ -339,7 +339,7 @@ def warp_sections(
             chunk_shape = target_volume.chunks
             tile_size_y = chunk_shape[1] * 2
             tile_size_x = chunk_shape[2] * 2
-            overlap = chunk_shape
+            overlap = chunk_shape[1]
             for y in range(0, yx_size[0], tile_size_y):
                 for x in range(0, yx_size[1], tile_size_x):
                     src_start_y = max(0, y - overlap)
