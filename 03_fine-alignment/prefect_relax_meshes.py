@@ -47,7 +47,7 @@ def relax_meshes_in_blocks_flow(
     relax_meshes_in_blocks(
         section_dirs=section_dirs,
         output_dir=output_dir,
-        integration_config=integration_config,
+        mesh_integration=integration_config,
         flow_stride=flow_stride,
         logger=get_run_logger(),
     )
@@ -63,7 +63,7 @@ def relax_mehses_cross_blocks_flow(
 ):
     relax_meshes_cross_blocks(
         output_dir=output_dir,
-        integration_config=integration_config,
+        mesh_integration=integration_config,
         flow_stride=flow_stride,
         logger=get_run_logger(),
     )

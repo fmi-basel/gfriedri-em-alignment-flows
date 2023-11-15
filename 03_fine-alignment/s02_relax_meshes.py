@@ -159,17 +159,17 @@ def mesh_optimization(
 def relax_meshes_in_blocks(
     section_dirs: list[str],
     output_dir: str,
-    integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    mesh_integration: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
     logger: logging.Logger = logging.getLogger("Relax Meshes"),
 ):
     store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
     map_zarr: zarr.Group = zarr.group(store=store)
     for block_index, i in enumerate(
-        range(0, len(section_dirs), integration_config.block_size)
+        range(0, len(section_dirs), mesh_integration.block_size)
     ):
         start = i
-        end = min(start + integration_config.block_size, len(section_dirs))
+        end = min(start + mesh_integration.block_size, len(section_dirs))
         start_name = section_name(section_dirs[start])
         end_name = section_name(section_dirs[end - 1])
         logger.info(f"Optimize meshes in block [{start_name}:{end_name}].")
@@ -179,14 +179,14 @@ def relax_meshes_in_blocks(
             block_index=block_index,
             map_zarr=map_zarr,
             stride=flow_stride,
-            integration_config=integration_config,
+            integration_config=mesh_integration,
             logger=logger,
         )
 
 
 def relax_meshes_cross_blocks(
     output_dir: str,
-    integration_config: MeshIntegrationConfig,
+    mesh_integration: MeshIntegrationConfig,
     flow_stride: int,
     logger: logging.Logger,
 ):
@@ -205,18 +205,18 @@ def relax_meshes_cross_blocks(
     )
 
     xblk_config = mesh.IntegrationConfig(
-        dt=integration_config.dt,
-        gamma=integration_config.gamma,
+        dt=mesh_integration.dt,
+        gamma=mesh_integration.gamma,
         k0=0.001,
-        k=integration_config.k,
+        k=mesh_integration.k,
         stride=xblk_stride,
-        num_iters=integration_config.num_iters,
-        max_iters=integration_config.max_iters,
-        stop_v_max=integration_config.stop_v_max,
-        dt_max=integration_config.dt_max,
-        start_cap=integration_config.start_cap,
-        final_cap=integration_config.final_cap,
-        prefer_orig_order=integration_config.prefer_orig_order,
+        num_iters=mesh_integration.num_iters,
+        max_iters=mesh_integration.max_iters,
+        stop_v_max=mesh_integration.stop_v_max,
+        dt_max=mesh_integration.dt_max,
+        start_cap=mesh_integration.start_cap,
+        final_cap=mesh_integration.final_cap,
+        prefer_orig_order=mesh_integration.prefer_orig_order,
     )
     logger.info(f"{x_block_flow.shape[1]} cross block flows to " f"solve.")
     origin = jnp.array([0.0, 0.0])
@@ -255,7 +255,7 @@ def relax_meshes(
     output_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
-    integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    mesh_integration: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
@@ -268,19 +268,19 @@ def relax_meshes(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
         n_sections=len(section_dirs) + 1,
-        block_size=integration_config.block_size,
+        block_size=mesh_integration.block_size,
     )
 
     relax_meshes_in_blocks(
         section_dirs=section_dirs,
         output_dir=output_dir,
-        integration_config=integration_config,
+        mesh_integration=mesh_integration,
         flow_stride=flow_stride,
     )
 
     relax_meshes_cross_blocks(
         output_dir=output_dir,
-        integration_config=integration_config,
+        mesh_integration=mesh_integration,
         flow_stride=flow_stride,
         logger=logging.Logger("relax meshes"),
     )
@@ -299,6 +299,6 @@ if __name__ == "__main__":
         output_dir=config["output_dir"],
         start_section=config["start_section"],
         end_section=config["end_section"],
-        integration_config=MeshIntegrationConfig(**config["mesh_integration"]),
+        mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
         flow_stride=config["flow_stride"],
     )
