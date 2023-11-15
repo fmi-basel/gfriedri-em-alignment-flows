@@ -75,7 +75,7 @@ def create_zarr(
         downscale = 2**level
         # Downscale only in YX
         shape = (
-            end_section - start_section,
+            end_section - start_section + 1,
             yx_size[0] // bin // downscale,
             yx_size[1] // bin // downscale,
         )
@@ -171,9 +171,9 @@ def main(
     store = parse_url(zarr_path, mode="w").store
     zarr_root = zarr.group(store=store)
 
-    for i in tqdm(range(len(section_dirs) - 1)):
+    for i in tqdm(range(len(section_dirs))):
         sec_id = int(basename(section_dirs[i]).split("_")[0][1:])
-        if start_section <= sec_id < end_section:
+        if start_section <= sec_id <= end_section:
             write_section(
                 section_dir=section_dirs[i],
                 start_section=start_section,
