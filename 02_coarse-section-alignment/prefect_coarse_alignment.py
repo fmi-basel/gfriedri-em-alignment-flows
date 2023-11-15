@@ -8,22 +8,13 @@ from prefect.task_runners import SequentialTaskRunner
 from prefect.tasks import task_input_hash
 from s01_coarse_align_section_pairs import (
     compute_shift,
+    filter_sections,
     get_padding_per_section,
     list_zarr_sections,
     load_shifts,
 )
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
-
-
-def filter(section_dirs: list[str], start_section: int, end_section: int):
-    kept = []
-    for sec in section_dirs:
-        sec_idx = int(basename(sec).split("_")[0][1:])
-        if start_section <= sec_idx <= end_section:
-            kept.append(sec)
-
-    return kept
 
 
 @task(
@@ -126,7 +117,7 @@ def coarse_alignment(
         root_dir=stitched_sections_dir,
     )
 
-    section_dirs = filter(
+    section_dirs = filter_sections(
         section_dirs=section_dirs,
         start_section=start_section,
         end_section=end_section,

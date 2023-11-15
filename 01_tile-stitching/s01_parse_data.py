@@ -1,6 +1,8 @@
+import argparse
 from glob import glob
 from os.path import exists, join
 
+import yaml
 from parameter_config import AcquisitionConfig
 from sbem.experiment.parse_utils import get_tile_metadata
 from sbem.record.Section import Section
@@ -87,13 +89,13 @@ def parse_data(
 
 
 def main(
-    section_dir: str,
+    output_dir: str,
     acquisition_conf: AcquisitionConfig = AcquisitionConfig(),
     start_section: int = 0,
     end_section: int = 10,
 ):
     _ = parse_data(
-        output_dir=section_dir,
+        output_dir=output_dir,
         sbem_root_dir=acquisition_conf.sbem_root_dir,
         acquisition=acquisition_conf.acquisition,
         tile_grid=acquisition_conf.tile_grid,
@@ -105,18 +107,16 @@ def main(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="tile-stitching.config")
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
 
     main(
-        section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
-        sbem_root_dir="/tungstenfs/scratch/gmicro/prefect-test/gfriedri-em"
-        "-alignment-flows/test-data/",
-        acquisition="run_0",
-        tile_grid="g0001",
-        thickness=25,
-        resolution_xy=11,
-        tile_width=3072,
-        tile_height=2304,
-        tile_overlap=220,
-        start_section=1074,
-        end_section=1098,
+        output_dir=join(config["output_dir"], "sections"),
+        acquisition_conf=AcquisitionConfig(**config["acquisition_config"]),
+        start_section=config["start_section"],
+        end_section=config["end_section"],
     )

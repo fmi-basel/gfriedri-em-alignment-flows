@@ -95,7 +95,7 @@ def build_config():
         max_parallel_jobs=10,
     )
 
-    with open("fine-align-estimate-flow-fields.config", "w") as f:
+    with open("fine_align_estimate_flow_fields.config", "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
 

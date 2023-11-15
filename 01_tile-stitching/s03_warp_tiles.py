@@ -1,6 +1,8 @@
+import argparse
 from glob import glob
 from os.path import dirname, join
 
+import yaml
 import zarr
 from numcodecs import Blosc
 from ome_zarr.io import parse_url
@@ -65,9 +67,16 @@ def main(output_dir: str, section_dir: str, stride: int, warp_config: WarpConfig
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="tile-stitching.config")
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     main(
-        output_dir="/home/tibuch/Data/gfriedri/2023-refactor/stitched-sections",
-        section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
-        stride=20,
-        warp_config=WarpConfig(),
+        output_dir=join(config["output_dir"], "stitched-sections"),
+        section_dir=join(config["output_dir"], "sections"),
+        stride=config["mesh_integration_config"]["stride"],
+        warp_config=WarpConfig(**config["warp_config"]),
     )

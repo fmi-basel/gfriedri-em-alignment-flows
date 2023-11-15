@@ -1,9 +1,11 @@
+import argparse
 import logging
 from glob import glob
 from os.path import basename, join, splitext
 
 import jax.numpy as jnp
 import numpy as np
+import yaml
 import zarr
 from connectomics.common import bounding_box
 from numcodecs import Blosc
@@ -285,4 +287,18 @@ def relax_meshes(
 
 
 if __name__ == "__main__":
-    relax_meshes()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="relax_meshes.config")
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
+    relax_meshes(
+        stitched_section_dir=config["stitched_sections_dir"],
+        output_dir=config["output_dir"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
+        integration_config=MeshIntegrationConfig(**config["mesh_integration"]),
+        flow_stride=config["flow_stride"],
+    )

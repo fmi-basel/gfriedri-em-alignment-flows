@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -5,6 +6,7 @@ from os.path import basename, join, splitext
 from pathlib import Path
 
 import numpy as np
+import yaml
 import zarr
 from connectomics.common import bounding_box
 from numpy._typing import ArrayLike
@@ -220,9 +222,18 @@ def estimate_flow_fields(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, default="fine_align_estimate_flow_fields.config"
+    )
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     estimate_flow_fields(
-        stitched_section_dir="/tungstenfs/temp/generic/stitched-sections/",
-        start_section=1074,
-        end_section=1088,
-        ffe_conf=FlowFieldEstimationConfig(),
+        stitched_section_dir=config["stitched_sections_dir"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
+        ffe_conf=FlowFieldEstimationConfig(**config["ffe_conf"]),
     )

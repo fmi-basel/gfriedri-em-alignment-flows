@@ -1,7 +1,9 @@
+import argparse
 import logging
 from glob import glob
 from os.path import dirname, exists, join
 
+import yaml
 from parameter_config import MeshIntegrationConfig, RegistrationConfig
 from sbem.record.Section import Section
 from sbem.tile_stitching.sofima_utils import register_tiles
@@ -81,6 +83,17 @@ def main(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="tile-stitching.config")
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     main(
-        section_dir="/home/tibuch/Data/gfriedri/2023-refactor/sections",
+        section_dir=join(config["output_dir"], "sections"),
+        mesh_integration_config=MeshIntegrationConfig(
+            **config["mesh_integration_config"]
+        ),
+        registration_config=RegistrationConfig(**config["registration_config"]),
     )

@@ -1,7 +1,9 @@
+import argparse
 import json
 from os.path import basename, join
 
 import numpy as np
+import yaml
 import zarr
 from numcodecs import Blosc
 from ome_zarr.format import CurrentFormat
@@ -182,13 +184,20 @@ def main(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, required=True, default="coarse-stack.config"
+    )
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     main(
-        stitched_section_dir="/tungstenfs/scratch/gmicro_sem/gfriedri/_processing/SOFIMA/user/ganctoma/runs/test/output/stitched-sections",
-        start_section=1074,
-        end_section=1098,
-        output_dir=".",
-        volume_name="test.zarr",
-        yx_start=(16000, 0),
-        yx_size=(4096 * 4, 4096 * 4),
-        bin=4,
+        stitched_section_dir=config["stitched_sections_dir"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
+        output_dir=config["output_dir"],
+        volume_name=config["volume_name"],
+        bin=config["bin"],
     )

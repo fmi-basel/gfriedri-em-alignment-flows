@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -6,6 +7,7 @@ from os.path import basename, join
 from pathlib import Path
 
 import numpy as np
+import yaml
 import zarr
 from connectomics.common import bounding_box
 from connectomics.volume import subvolume
@@ -441,13 +443,22 @@ def warp_fine_aligned_sections(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, default="warp_fine_aligned_sections.config"
+    )
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     warp_fine_aligned_sections(
-        stitched_sections_dir="/path/to/stitched-sections-testing",
-        output_dir="/path/to/output_dir",
-        flow_stride=40,
-        start_section=0,
-        end_section=9,
-        block_size=50,
-        map_zarr_dir="/path/to/maps.zarr",
-        volume_name="fine_aligned_volume.zarr",
+        stitched_sections_dir=config["stitched_sections_dir"],
+        output_dir=config["output_dir"],
+        volume_name=config["volume_name"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
+        block_size=config["block_size"],
+        map_zarr_dir=config["map_zarr_dir"],
+        flow_stride=config["flow_stride"],
     )
