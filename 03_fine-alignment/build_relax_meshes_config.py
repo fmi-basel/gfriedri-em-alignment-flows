@@ -130,6 +130,8 @@ def build_config():
         ).ask()
     )
 
+    output_dir = questionary.path("Path to the output directory:").ask()
+
     config = dict(
         user=user_name,
         stitched_sections_dir=stitched_sections_dir,
@@ -137,6 +139,7 @@ def build_config():
         end_section=end_section,
         integration_config=mic.dict(),
         flow_stride=flow_stride,
+        output_dir=output_dir,
     )
 
     with open("relax_meshes.config", "w") as f:
