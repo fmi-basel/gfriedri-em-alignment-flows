@@ -158,3 +158,4 @@ src/sbem/_version.py
 .ipynb
 scratch_pad/
 deployment/
+deployments/
