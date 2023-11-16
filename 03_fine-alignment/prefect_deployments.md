@@ -36,6 +36,12 @@ prefect deployment build 03_fine-alignment/prefect_relax_meshes.py:relax_mehses_
 
 
 prefect deployment build 03_fine-alignment/prefect_relax_meshes.py:relax_meshes_flow --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 03_fine-alignment/deployments/ganctoma-relax_meshes.yaml -ib process/gfriedri-em-alignment-ganctoma-orchestration
+
+
+prefect deployment build 03_fine-alignment/prefect_warp_fine_aligned.py:warp_sections_flow --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 03_fine-alignment/deployments/ganctoma-warp_sections_flow.yaml -ib process/gfriedri-em-alignment-ganctoma-cpu
+
+
+prefect deployment build 03_fine-alignment/prefect_warp_fine_aligned.py:warp_fine_alignment --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 03_fine-alignment/deployments/ganctoma-warp_fine_alignment.yaml -ib process/gfriedri-em-alignment-ganctoma-orchestration
 ```
 
 # kappjoha
@@ -53,4 +59,10 @@ prefect deployment build 03_fine-alignment/prefect_relax_meshes.py:relax_mehses_
 
 
 prefect deployment build 03_fine-alignment/prefect_relax_meshes.py:relax_meshes_flow --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 03_fine-alignment/deployments/kappjoha-relax_meshes.yaml -ib process/gfriedri-em-alignment-kappjoha-orchestration
+
+
+prefect deployment build 03_fine-alignment/prefect_warp_fine_aligned.py:warp_sections_flow --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 03_fine-alignment/deployments/kappjoha-warp_sections_flow.yaml -ib process/gfriedri-em-alignment-kappjoha-cpu
+
+
+prefect deployment build 03_fine-alignment/prefect_warp_fine_aligned.py:warp_fine_alignment --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 03_fine-alignment/deployments/kappjoha-warp_fine_alignment.yaml -ib process/gfriedri-em-alignment-kappjoha-orchestration
 ```
