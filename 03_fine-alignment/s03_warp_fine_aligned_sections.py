@@ -153,8 +153,6 @@ def reconcile_flow(
     reconcile.set_effective_subvol_and_overlap(main_map.shape[1:][::-1], (0, 0, 0))
     size = (*main_map.shape[2:][::-1], end_section - start_section)
     main_box = bounding_box.BoundingBox(start=(0, 0, start_section), size=size)
-    logger.info(f"main_box = {main_box}")
-    logger.info(f"main_map.shape = {main_map.shape}")
     reconciled_flow = reconcile.process(
         subvolume.Subvolume(main_map[:, start_section:end_section], main_box)
     ).data
@@ -177,15 +175,10 @@ def load_section_data(
         pad_x = config["shift_x"]
 
     zarray = zarr.Group(parse_url(section_dir).store)[0]
-    logger.info(f"zarray.shape = {zarray.shape}")
-    logger.info(f"padding = ({pad_y}, {pad_x})")
     sec_start_y = max(0, yx_start[0] - pad_y)
     sec_start_x = max(0, yx_start[1] - pad_x)
     sec_end_y = min(max(0, yx_end[0] - pad_y), zarray.shape[0])
     sec_end_x = min(max(0, yx_end[1] - pad_x), zarray.shape[1])
-
-    logger.info(f"sec_start = ({sec_start_y}, {sec_start_x})")
-    logger.info(f"sec_end = ({sec_end_y}, {sec_end_x})")
 
     data = np.zeros(
         (yx_end[0] - yx_start[0], yx_end[1] - yx_start[1]), dtype=zarray.dtype
@@ -197,11 +190,9 @@ def load_section_data(
         or sec_end_y == 0  # noqa: W503
         or sec_end_x == 0  # noqa: W503
     ):
-        logger.info("Return zeros")
         # no data in this section
         return data
     else:
-        logger.info("Return data")
         data[: sec_end_y - sec_start_y, : sec_end_x - sec_start_x] = zarray[
             sec_start_y:sec_end_y, sec_start_x:sec_end_x
         ]
@@ -295,9 +286,7 @@ def warp_subvolume(
         orig_dtype
     )
 
-    sum = warped.sum()
-    logger.info(f"warped.sum() = {sum}")
-    if sum > 0:
+    if warped.sum() > 0:
         target_volume[z, out_start_y:out_end_y, out_start_x:out_end_x] = warped
 
 
