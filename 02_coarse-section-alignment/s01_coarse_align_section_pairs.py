@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -5,6 +6,7 @@ from os.path import basename, join
 from pathlib import Path
 
 import numpy as np
+import yaml
 import zarr
 from ome_zarr.io import parse_url
 from sofima import stitch_rigid
@@ -13,6 +15,16 @@ from tqdm import tqdm
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_FLAGS"] = "--xla_gpu_strict_conv_algorithm_picker=false"
+
+
+def filter_sections(section_dirs: list[str], start_section: int, end_section: int):
+    kept = []
+    for sec in section_dirs:
+        sec_idx = int(basename(sec).split("_")[0][1:])
+        if start_section <= sec_idx <= end_section:
+            kept.append(sec)
+
+    return kept
 
 
 def compute_extent(s1, s2):
@@ -152,9 +164,15 @@ def get_padding_per_section(shifts):
     return cumulated_padding
 
 
-def main(stitched_section_dir: str):
+def main(stitched_section_dir: str, start_section: int = 0, end_section: int = 10):
     section_dirs = list_zarr_sections(
         root_dir=stitched_section_dir,
+    )
+
+    section_dirs = filter_sections(
+        section_dirs=section_dirs,
+        start_section=start_section,
+        end_section=end_section,
     )
 
     for i in tqdm(range(len(section_dirs) - 1)):
@@ -170,6 +188,17 @@ def main(stitched_section_dir: str):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, required=True, default="coarse-align.config"
+    )
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     main(
-        stitched_section_dir="/tungstenfs/scratch/gmicro_sem/gfriedri/_processing/SOFIMA/user/ganctoma/runs/test/output/stitched-sections",
+        stitched_section_dir=config["stitched_sections_dir"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
     )

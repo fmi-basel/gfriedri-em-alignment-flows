@@ -1,7 +1,9 @@
+import argparse
 import json
 from os.path import basename, join
 
 import numpy as np
+import yaml
 import zarr
 from numcodecs import Blosc
 from ome_zarr.format import CurrentFormat
@@ -73,7 +75,7 @@ def create_zarr(
         downscale = 2**level
         # Downscale only in YX
         shape = (
-            end_section - start_section,
+            end_section - start_section + 1,
             yx_size[0] // bin // downscale,
             yx_size[1] // bin // downscale,
         )
@@ -169,9 +171,9 @@ def main(
     store = parse_url(zarr_path, mode="w").store
     zarr_root = zarr.group(store=store)
 
-    for i in tqdm(range(len(section_dirs) - 1)):
+    for i in tqdm(range(len(section_dirs))):
         sec_id = int(basename(section_dirs[i]).split("_")[0][1:])
-        if start_section <= sec_id < end_section:
+        if start_section <= sec_id <= end_section:
             write_section(
                 section_dir=section_dirs[i],
                 start_section=start_section,
@@ -182,13 +184,20 @@ def main(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config", type=str, required=True, default="coarse-stack.config"
+    )
+    args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = yaml.safe_load(f)
+
     main(
-        stitched_section_dir="/tungstenfs/scratch/gmicro_sem/gfriedri/_processing/SOFIMA/user/ganctoma/runs/test/output/stitched-sections",
-        start_section=1074,
-        end_section=1098,
-        output_dir=".",
-        volume_name="test.zarr",
-        yx_start=(16000, 0),
-        yx_size=(4096 * 4, 4096 * 4),
-        bin=4,
+        stitched_section_dir=config["stitched_sections_dir"],
+        start_section=config["start_section"],
+        end_section=config["end_section"],
+        output_dir=config["output_dir"],
+        volume_name=config["volume_name"],
+        bin=config["bin"],
     )
