@@ -41,13 +41,13 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
 def relax_meshes_in_blocks_flow(
     section_dirs: list[str],
     output_dir: str,
-    integration_config: MeshIntegrationConfig,
+    mesh_integration: MeshIntegrationConfig,
     flow_stride: int,
 ):
     relax_meshes_in_blocks(
         section_dirs=section_dirs,
         output_dir=output_dir,
-        mesh_integration=integration_config,
+        mesh_integration=mesh_integration,
         flow_stride=flow_stride,
         logger=get_run_logger(),
     )
@@ -59,11 +59,11 @@ def relax_meshes_in_blocks_flow(
     cache_result_in_memory=False,
 )
 def relax_mehses_cross_blocks_flow(
-    output_dir: str, integration_config: MeshIntegrationConfig, flow_stride: int
+    output_dir: str, mesh_integration: MeshIntegrationConfig, flow_stride: int
 ):
     relax_meshes_cross_blocks(
         output_dir=output_dir,
-        mesh_integration=integration_config,
+        mesh_integration=mesh_integration,
         flow_stride=flow_stride,
         logger=get_run_logger(),
     )
@@ -76,7 +76,7 @@ def relax_meshes_flow(
     output_dir: str = "",
     start_section: int = 0,
     end_section: int = 9,
-    integration_config: MeshIntegrationConfig = MeshIntegrationConfig(),
+    mesh_integration: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
@@ -89,11 +89,11 @@ def relax_meshes_flow(
         output_dir=output_dir,
         shape=dummy_flow.shape[2:],
         n_sections=len(section_dirs) + 1,
-        block_size=integration_config.block_size,
+        block_size=mesh_integration.block_size,
     )
 
-    chunk_factor = 100 // integration_config.block_size
-    chunk_size = chunk_factor * integration_config.block_size
+    chunk_factor = 100 // mesh_integration.block_size
+    chunk_size = chunk_factor * mesh_integration.block_size
     runs = []
     for i, chunk_start in enumerate(range(0, len(section_dirs), chunk_size)):
         runs.append(
@@ -102,7 +102,7 @@ def relax_meshes_flow(
                 parameters=dict(
                     section_dirs=section_dirs[chunk_start : chunk_start + chunk_size],
                     output_dir=output_dir,
-                    integration_config=integration_config,
+                    mesh_integration=mesh_integration,
                     flow_stride=flow_stride,
                 ),
                 batch=i,
@@ -117,7 +117,7 @@ def relax_meshes_flow(
         flow_name=f"[SOFIMA] Relax Meshes Cross Blocks/{user}",
         parameters=dict(
             output_dir=output_dir,
-            integration_config=integration_config,
+            mesh_integration=mesh_integration,
             flow_stride=flow_stride,
         ),
         batch=0,
