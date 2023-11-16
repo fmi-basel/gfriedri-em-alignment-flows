@@ -119,7 +119,7 @@ def create_coarse_stack(
     filtered_section_dirs = []
     for sec in section_dirs:
         sec_id = int(basename(sec).split("_")[0][1:])
-        if start_section <= sec_id < end_section:
+        if start_section <= sec_id <= end_section:
             filtered_section_dirs.append(sec)
 
     logger.info(len(filtered_section_dirs))
