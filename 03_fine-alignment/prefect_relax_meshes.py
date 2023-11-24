@@ -24,6 +24,8 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
     refresh_cache=True,
+    retries=2,
+    retry_delay_seconds=10,
 )
 def submit_flowrun(flow_name: str, parameters: dict, batch: int):
     run: FlowRun = run_deployment(
