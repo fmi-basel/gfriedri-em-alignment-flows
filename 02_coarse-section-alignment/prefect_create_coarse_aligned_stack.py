@@ -69,6 +69,8 @@ def write_section_task(
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
+    retries=1,
+    retry_delay_seconds=60,
 )
 def write_coarse_aligned_sections(
     section_dirs: list[str],
@@ -96,6 +98,7 @@ def write_coarse_aligned_sections(
     persist_result=True,
     cache_result_in_memory=False,
     retries=1,
+    retry_delay_seconds=60,
 )
 def create_coarse_stack(
     user: str,

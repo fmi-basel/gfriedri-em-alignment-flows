@@ -55,6 +55,8 @@ def parse_data_task(
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
     refresh_cache=True,
+    retries=2,
+    retry_delay_seconds=5,
 )
 def submit_flowrun(flow_name: str, parameters: dict, batch: int):
     run: FlowRun = run_deployment(

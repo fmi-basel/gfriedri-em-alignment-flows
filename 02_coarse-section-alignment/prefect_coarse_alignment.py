@@ -23,6 +23,8 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
     result_storage_key="{flow_run.name}/submit flow-run/{task_run.id}.json",
     cache_result_in_memory=False,
     cache_key_fn=task_input_hash,
+    retries=2,
+    retry_delay_seconds=10,
 )
 def submit_flowrun(
     flow_name: str,
@@ -89,6 +91,8 @@ def compute_padding(section_dirs):
     persist_result=True,
     task_runner=SequentialTaskRunner(),
     cache_result_in_memory=False,
+    retries=1,
+    retry_delay_seconds=60,
 )
 def coarse_align_pairs(section_dirs: list[str]):
     for i in range(len(section_dirs) - 1):
@@ -105,6 +109,7 @@ def coarse_align_pairs(section_dirs: list[str]):
     persist_result=True,
     cache_result_in_memory=False,
     retries=1,
+    retry_delay_seconds=60,
 )
 def coarse_alignment(
     user: str,
