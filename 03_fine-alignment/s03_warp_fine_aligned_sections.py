@@ -193,7 +193,12 @@ def load_section_data(
         # no data in this section
         return data
     else:
-        data[: sec_end_y - sec_start_y, : sec_end_x - sec_start_x] = zarray[
+        chunk_shape = data.shape
+        chunk_start_y = max(0, pad_y - yx_start[0])
+        chunk_end_y = min(chunk_shape[0], chunk_start_y + sec_end_y - sec_start_y)
+        chunk_start_x = max(0, pad_x - yx_start[1])
+        chunk_end_x = min(chunk_shape[1], chunk_start_x + sec_end_x - sec_start_x)
+        data[chunk_start_y:chunk_end_y, chunk_start_x:chunk_end_x] = zarray[
             sec_start_y:sec_end_y, sec_start_x:sec_end_x
         ]
         return data
