@@ -49,7 +49,10 @@ def submit_flowrun(
 def list_zarr_sections_task(
     root_dir: str,
 ):
-    return list_zarr_sections(root_dir=root_dir)
+    try:
+        return list_zarr_sections(root_dir=root_dir)
+    except StopIteration as ex:
+        raise RuntimeError(ex)
 
 
 @task(
