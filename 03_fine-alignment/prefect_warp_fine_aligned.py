@@ -67,9 +67,12 @@ def warp_fine_alignment(
     max_parallel_jobs: int = 25,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
+    logger = get_run_logger()
+    logger.info(f"Found the following sections: {section_dirs}")
     section_dirs = filter_sections(
         section_dirs=section_dirs, start_section=start_section, end_section=end_section
     )
+    logger.info(f"Process the following sections: {section_dirs}")
 
     blocks = []
     for i in range(0, len(section_dirs), block_size):
