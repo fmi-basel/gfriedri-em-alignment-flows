@@ -68,11 +68,10 @@ def warp_fine_alignment(
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
     logger = get_run_logger()
-    logger.info(f"Found the following sections: {section_dirs}")
     section_dirs = filter_sections(
         section_dirs=section_dirs, start_section=start_section, end_section=end_section
     )
-    logger.info(f"Process the following sections: {section_dirs}")
+    logger.info(f"Process {len(section_dirs)} sections.")
 
     blocks = []
     for i in range(0, len(section_dirs), block_size):
@@ -94,7 +93,7 @@ def warp_fine_alignment(
     batch_size = n_sections // n_jobs
 
     runs = []
-    for batch_idx, i in enumerate(range(n_sections, batch_size)):
+    for batch_idx, i in enumerate(range(0, n_sections, batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Warp Sections/{user}",
