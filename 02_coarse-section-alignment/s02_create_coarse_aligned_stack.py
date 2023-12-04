@@ -1,6 +1,6 @@
 import argparse
 import json
-from os.path import basename, join
+from os.path import join
 
 import numpy as np
 import yaml
@@ -9,7 +9,7 @@ from numcodecs import Blosc
 from ome_zarr.format import CurrentFormat
 from ome_zarr.io import parse_url
 from ome_zarr.scale import Scaler
-from s01_coarse_align_section_pairs import list_zarr_sections
+from s01_coarse_align_section_pairs import filter_sections, list_zarr_sections
 from skimage.measure import block_reduce
 from tqdm import tqdm
 
@@ -25,14 +25,12 @@ def load_padding(section_dir: str) -> tuple[int, int]:
 
 def write_section(
     section_dir: str,
-    start_section: int,
+    out_z: int,
     yx_size: tuple[int, int],
     bin: int,
     zarr_root: zarr.Group,
 ):
     scaler = Scaler(max_layer=4)
-    sec_id = int(basename(section_dir).split("_")[0][1:])
-    output_index = sec_id - start_section
     current = zarr.Group(parse_url(section_dir).store)
     y_pad, x_pad = load_padding(section_dir)
     data = block_reduce(
@@ -50,7 +48,7 @@ def write_section(
         x_start = x_pad // bin // (scaler.downscale**level)
         x_end = x_start + data.shape[1]
         zarr_root[level][
-            output_index,
+            out_z,
             y_start:y_end,
             x_start:x_end,
         ] = data
@@ -60,8 +58,7 @@ def write_section(
 def create_zarr(
     output_dir: str,
     volume_name: str,
-    start_section: int,
-    end_section: int,
+    n_sections: int,
     yx_size: tuple[int, int],
     bin: int,
 ):
@@ -75,7 +72,7 @@ def create_zarr(
         downscale = 2**level
         # Downscale only in YX
         shape = (
-            end_section - start_section + 1,
+            n_sections,
             yx_size[0] // bin // downscale,
             yx_size[1] // bin // downscale,
         )
@@ -156,14 +153,18 @@ def main(
     section_dirs = list_zarr_sections(
         root_dir=stitched_section_dir,
     )
+    section_dirs = filter_sections(
+        section_dirs=section_dirs,
+        start_section=start_section,
+        end_section=end_section,
+    )
 
     yx_size = get_yx_size(section_dirs, bin=bin)
 
     zarr_path = create_zarr(
         output_dir=output_dir,
         volume_name=volume_name,
-        start_section=start_section,
-        end_section=end_section,
+        n_sections=len(section_dirs),
         yx_size=yx_size,
         bin=bin,
     )
@@ -172,15 +173,13 @@ def main(
     zarr_root = zarr.group(store=store)
 
     for i in tqdm(range(len(section_dirs))):
-        sec_id = int(basename(section_dirs[i]).split("_")[0][1:])
-        if start_section <= sec_id <= end_section:
-            write_section(
-                section_dir=section_dirs[i],
-                start_section=start_section,
-                yx_size=yx_size,
-                bin=bin,
-                zarr_root=zarr_root,
-            )
+        write_section(
+            section_dir=section_dirs[i],
+            out_z=i,
+            yx_size=yx_size,
+            bin=bin,
+            zarr_root=zarr_root,
+        )
 
 
 if __name__ == "__main__":

@@ -15,8 +15,6 @@ def warp_sections_flow(
     target_dir: str,
     yx_size: tuple[int, int],
     offset: int,
-    start_section: int,
-    end_section: int,
     blocks: list[tuple[int, int]],
     map_zarr_dir: str,
     flow_stride: int,
@@ -26,8 +24,6 @@ def warp_sections_flow(
         target_dir=target_dir,
         yx_size=yx_size,
         offset=offset,
-        start_section=start_section,
-        end_section=end_section,
         blocks=blocks,
         map_zarr_dir=map_zarr_dir,
         flow_stride=flow_stride,
@@ -68,7 +64,7 @@ def warp_fine_alignment(
     block_size: int = 50,
     map_zarr_dir: str = "",
     flow_stride: int = 40,
-    max_parallel_jobs: int = 10,
+    max_parallel_jobs: int = 25,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
     section_dirs = filter_sections(
@@ -84,19 +80,18 @@ def warp_fine_alignment(
     target_dir = create_zarr(
         output_dir=output_dir,
         volume_name=volume_name,
-        start_section=start_section,
-        end_section=end_section,
+        n_sections=len(section_dirs),
         yx_size=yx_size,
         bin=1,
     )
 
-    n_sections = end_section - start_section
+    n_sections = len(section_dirs)
     batch_size = int(max(10, min(n_sections // max_parallel_jobs, 250)))
     n_jobs = n_sections // batch_size + 1
     batch_size = n_sections // n_jobs
 
     runs = []
-    for batch_idx, i in enumerate(range(start_section, end_section, batch_size)):
+    for batch_idx, i in enumerate(range(n_sections, batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Warp Sections/{user}",
@@ -106,9 +101,7 @@ def warp_fine_alignment(
                     ],
                     target_dir=target_dir,
                     yx_size=yx_size,
-                    offset=start_section,
-                    start_section=i,
-                    end_section=i + batch_size,
+                    offset=i,
                     blocks=blocks,
                     map_zarr_dir=map_zarr_dir,
                     flow_stride=flow_stride,
