@@ -96,26 +96,28 @@ def warp_fine_alignment(
     runs = []
     for batch_idx, i in enumerate(range(0, n_sections, batch_size)):
         sleep(5)
-        runs.append(
-            submit_flowrun.submit(
-                flow_name=f"[SOFIMA] Warp Sections/{user}",
-                parameters=dict(
-                    section_dirs=section_dirs[
-                        batch_idx * batch_size : (batch_idx + 1) * batch_size
-                    ],
-                    warp_start_section=warp_start_section,
-                    warp_end_section=warp_end_section,
-                    target_dir=target_dir,
-                    yx_size=yx_size,
-                    offset=i,
-                    blocks=blocks,
-                    map_zarr_dir=map_zarr_dir,
-                    flow_stride=flow_stride,
-                ),
-                batch=batch_idx,
-                return_state=False,
+        start_id = int(section_dirs[batch_idx * batch_size].split("_")[0][1:])
+        if warp_start_section <= start_id <= warp_end_section:
+            runs.append(
+                submit_flowrun.submit(
+                    flow_name=f"[SOFIMA] Warp Sections/{user}",
+                    parameters=dict(
+                        section_dirs=section_dirs[
+                            batch_idx * batch_size : (batch_idx + 1) * batch_size
+                        ],
+                        warp_start_section=warp_start_section,
+                        warp_end_section=warp_end_section,
+                        target_dir=target_dir,
+                        yx_size=yx_size,
+                        offset=i,
+                        blocks=blocks,
+                        map_zarr_dir=map_zarr_dir,
+                        flow_stride=flow_stride,
+                    ),
+                    batch=batch_idx,
+                    return_state=False,
+                )
             )
-        )
 
     some_failed = False
     for run in runs:
