@@ -7,16 +7,16 @@ def build_config():
     stitched_sections_dir = questionary.path(
         "Path to the stitched sections directory:"
     ).ask()
-    start_section = int(
+    warp_start_section = int(
         questionary.text(
-            "Start section:",
+            "Warp start section:",
             default="0",
             validate=lambda x: x.isdigit() and int(x) >= 0,
         ).ask()
     )
-    end_section = int(
+    warp_end_section = int(
         questionary.text(
-            "End section:",
+            "Warp end section:",
             default="9",
             validate=lambda x: x.isdigit() and int(x) >= 0,
         ).ask()
@@ -48,8 +48,8 @@ def build_config():
     config = dict(
         user=user_name,
         stitched_sections_dir=stitched_sections_dir,
-        start_section=start_section,
-        end_section=end_section,
+        warp_start_section=warp_start_section,
+        warp_end_section=warp_end_section,
         flow_stride=flow_stride,
         block_size=block_size,
         map_zarr_dir=map_zarr_dir,

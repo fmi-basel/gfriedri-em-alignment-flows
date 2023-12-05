@@ -1,9 +1,11 @@
+from time import sleep
+
 from prefect import flow, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.deployments import run_deployment
 from prefect.states import Completed, Failed
 from prefect.tasks import task_input_hash
-from s01_estimate_flow_fields import filter_sections, get_yx_size, list_zarr_sections
+from s01_estimate_flow_fields import get_yx_size, list_zarr_sections
 from s03_warp_fine_aligned_sections import create_zarr, warp_sections
 
 RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
@@ -12,6 +14,8 @@ RESULT_STORAGE_KEY = "{flow_run.name}/{task_run.task_name}/{task_run.name}.json"
 @flow(name="[SOFIMA] Warp Sections", persist_result=True, cache_result_in_memory=False)
 def warp_sections_flow(
     section_dirs: list[str],
+    warp_start_section: int,
+    warp_end_section: int,
     target_dir: str,
     yx_size: tuple[int, int],
     offset: int,
@@ -21,6 +25,8 @@ def warp_sections_flow(
 ):
     warp_sections(
         section_dirs=section_dirs,
+        warp_start_section=warp_start_section,
+        warp_end_section=warp_end_section,
         target_dir=target_dir,
         yx_size=yx_size,
         offset=offset,
@@ -57,21 +63,16 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
 def warp_fine_alignment(
     user: str = "",
     stitched_sections_dir: str = "",
+    warp_start_section: int = 0,
+    warp_end_section: int = 9,
     output_dir: str = "",
     volume_name: str = "",
-    start_section: int = 0,
-    end_section: int = 9,
     block_size: int = 50,
     map_zarr_dir: str = "",
     flow_stride: int = 40,
     max_parallel_jobs: int = 25,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
-    logger = get_run_logger()
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
-    logger.info(f"Process {len(section_dirs)} sections.")
 
     blocks = []
     for i in range(0, len(section_dirs), block_size):
@@ -94,6 +95,7 @@ def warp_fine_alignment(
 
     runs = []
     for batch_idx, i in enumerate(range(0, n_sections, batch_size)):
+        sleep(5)
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Warp Sections/{user}",
@@ -101,6 +103,8 @@ def warp_fine_alignment(
                     section_dirs=section_dirs[
                         batch_idx * batch_size : (batch_idx + 1) * batch_size
                     ],
+                    warp_start_section=warp_start_section,
+                    warp_end_section=warp_end_section,
                     target_dir=target_dir,
                     yx_size=yx_size,
                     offset=i,

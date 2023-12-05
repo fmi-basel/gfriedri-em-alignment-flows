@@ -14,7 +14,7 @@ from connectomics.volume import subvolume
 from numcodecs import Blosc
 from ome_zarr.format import CurrentFormat
 from ome_zarr.io import parse_url
-from s01_estimate_flow_fields import filter_sections, get_yx_size
+from s01_estimate_flow_fields import get_yx_size
 from scipy.interpolate import RegularGridInterpolator
 from sofima import map_utils
 from sofima.processor import maps
@@ -296,6 +296,8 @@ def warp_subvolume(
 
 def warp_sections(
     section_dirs: list[str],
+    warp_start_section: int,
+    warp_end_section: int,
     target_dir: str,
     yx_size: tuple[int, int],
     offset: int,
@@ -308,88 +310,89 @@ def warp_sections(
     map_zarr: zarr.Group = zarr.group(store=store)
 
     target_volume = zarr.group(store=parse_url(path=target_dir, mode="w").store)[0]
-    logger.info(f"Processing {len(section_dirs)} sections.")
     for i, section_dir in enumerate(section_dirs):
+
         sec_id = int(basename(section_dir).split("_")[0][1:])
-        logger.info(f"Warp section {sec_id}.")
-        inv_map, box = reconcile_flow(
-            blocks=blocks,
-            main_map=map_zarr["main"],
-            main_inv_map=map_zarr["main_inv"],
-            cross_block_map=map_zarr["cross_block"],
-            cross_block_inv_map=map_zarr["cross_block_inv"],
-            last_inv_map=map_zarr["last_inv"],
-            stride=flow_stride,
-            start_section=i + offset,
-            end_section=i + offset + 1,
-            logger=logger,
-        )
+        if warp_start_section <= sec_id <= warp_end_section:
+            logger.info(f"Warp section {sec_id}.")
+            inv_map, box = reconcile_flow(
+                blocks=blocks,
+                main_map=map_zarr["main"],
+                main_inv_map=map_zarr["main_inv"],
+                cross_block_map=map_zarr["cross_block"],
+                cross_block_inv_map=map_zarr["cross_block_inv"],
+                last_inv_map=map_zarr["last_inv"],
+                stride=flow_stride,
+                start_section=i + offset,
+                end_section=i + offset + 1,
+                logger=logger,
+            )
 
-        chunk_shape = target_volume.chunks
-        tile_size_y = chunk_shape[1] * 2
-        tile_size_x = chunk_shape[2] * 2
-        overlap = chunk_shape[1]
-        for y in range(0, yx_size[0], tile_size_y):
-            for x in range(0, yx_size[1], tile_size_x):
-                src_start_y = max(0, y - overlap)
-                src_start_x = max(0, x - overlap)
-                src_end_y = min(
-                    min(y + tile_size_y + overlap, y + yx_size[0] + overlap),
-                    target_volume.shape[1],
-                )
-                src_end_x = min(
-                    min(x + tile_size_x + overlap, x + yx_size[1] + overlap),
-                    target_volume.shape[2],
-                )
-                src_data = load_section_data(
-                    section_dir=section_dir,
-                    yx_start=(src_start_y, src_start_x),
-                    yx_end=(src_end_y, src_end_x),
-                    logger=logger,
-                )[np.newaxis, np.newaxis]
-
-                sum = src_data.sum()
-                if sum > 0:
-                    img_box = bounding_box.BoundingBox(
-                        start=(src_start_x, src_start_y, 0),
-                        size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
-                    )
-
-                    out_end_y = min(
-                        y + tile_size_y,
+            chunk_shape = target_volume.chunks
+            tile_size_y = chunk_shape[1] * 2
+            tile_size_x = chunk_shape[2] * 2
+            overlap = chunk_shape[1]
+            for y in range(0, yx_size[0], tile_size_y):
+                for x in range(0, yx_size[1], tile_size_x):
+                    src_start_y = max(0, y - overlap)
+                    src_start_x = max(0, x - overlap)
+                    src_end_y = min(
+                        min(y + tile_size_y + overlap, y + yx_size[0] + overlap),
                         target_volume.shape[1],
                     )
-                    out_end_x = min(
-                        x + tile_size_x,
+                    src_end_x = min(
+                        min(x + tile_size_x + overlap, x + yx_size[1] + overlap),
                         target_volume.shape[2],
                     )
-                    out_box = bounding_box.BoundingBox(
-                        start=(x, y, 0), size=(out_end_x - x, out_end_y - y, 1)
-                    )
-
-                    warp_subvolume(
-                        image=src_data,
-                        image_box=img_box,
-                        coord_map=inv_map,
-                        map_box=box,
-                        stride=flow_stride,
-                        out_box=out_box,
-                        target_volume=target_volume,
-                        z=offset + i,
-                        out_start_y=y,
-                        out_end_y=out_end_y,
-                        out_start_x=x,
-                        out_end_x=out_end_x,
+                    src_data = load_section_data(
+                        section_dir=section_dir,
+                        yx_start=(src_start_y, src_start_x),
+                        yx_end=(src_end_y, src_end_x),
                         logger=logger,
-                    )
+                    )[np.newaxis, np.newaxis]
+
+                    sum = src_data.sum()
+                    if sum > 0:
+                        img_box = bounding_box.BoundingBox(
+                            start=(src_start_x, src_start_y, 0),
+                            size=(src_end_x - src_start_x, src_end_y - src_start_y, 1),
+                        )
+
+                        out_end_y = min(
+                            y + tile_size_y,
+                            target_volume.shape[1],
+                        )
+                        out_end_x = min(
+                            x + tile_size_x,
+                            target_volume.shape[2],
+                        )
+                        out_box = bounding_box.BoundingBox(
+                            start=(x, y, 0), size=(out_end_x - x, out_end_y - y, 1)
+                        )
+
+                        warp_subvolume(
+                            image=src_data,
+                            image_box=img_box,
+                            coord_map=inv_map,
+                            map_box=box,
+                            stride=flow_stride,
+                            out_box=out_box,
+                            target_volume=target_volume,
+                            z=offset + i,
+                            out_start_y=y,
+                            out_end_y=out_end_y,
+                            out_start_x=x,
+                            out_end_x=out_end_x,
+                            logger=logger,
+                        )
 
 
 def warp_fine_aligned_sections(
     stitched_sections_dir: str,
+    warp_start_section: int,
+    warp_end_section: int,
     output_dir: str,
     volume_name: str,
-    start_section: int,
-    end_section: int,
     block_size: int,
     map_zarr_dir: str,
     flow_stride: int,
@@ -398,9 +401,6 @@ def warp_fine_aligned_sections(
     zarr.blosc.use_threads = False
 
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
 
     blocks = []
     for i in range(0, len(section_dirs), block_size):
@@ -418,9 +418,11 @@ def warp_fine_aligned_sections(
 
     warp_sections(
         section_dirs=section_dirs,
+        warp_start_section=warp_start_section,
+        warp_end_section=warp_end_section,
         target_dir=target_dir,
         yx_size=yx_size,
-        offset=start_section,
+        offset=0,
         blocks=blocks,
         map_zarr_dir=map_zarr_dir,
         flow_stride=flow_stride,
@@ -440,10 +442,10 @@ if __name__ == "__main__":
 
     warp_fine_aligned_sections(
         stitched_sections_dir=config["stitched_sections_dir"],
+        warp_start_section=config["warp_start_section"],
+        warp_end_section=config["warp_end_section"],
         output_dir=config["output_dir"],
         volume_name=config["volume_name"],
-        start_section=config["start_section"],
-        end_section=config["end_section"],
         block_size=config["block_size"],
         map_zarr_dir=config["map_zarr_dir"],
         flow_stride=config["flow_stride"],
