@@ -1,3 +1,4 @@
+from os.path import basename
 from time import sleep
 
 from prefect import flow, get_run_logger, task
@@ -88,16 +89,22 @@ def warp_fine_alignment(
         bin=1,
     )
 
+    n_sections_to_process = 0
+    for i in range(len(section_dirs)):
+        start_id = int(basename(section_dirs[i]).split("_")[0][1:])
+        if warp_start_section <= start_id <= warp_end_section:
+            n_sections_to_process += 1
+
     n_sections = len(section_dirs)
-    batch_size = int(max(10, min(n_sections // max_parallel_jobs, 250)))
-    n_jobs = n_sections // batch_size + 1
-    batch_size = n_sections // n_jobs
+    batch_size = int(max(10, min(n_sections_to_process // max_parallel_jobs, 250)))
+    n_jobs = n_sections_to_process // batch_size + 1
+    batch_size = n_sections_to_process // n_jobs
 
     runs = []
     for batch_idx, i in enumerate(range(0, n_sections, batch_size)):
-        sleep(5)
-        start_id = int(section_dirs[batch_idx * batch_size].split("_")[0][1:])
+        start_id = int(basename(section_dirs[batch_idx * batch_size]).split("_")[0][1:])
         if warp_start_section <= start_id <= warp_end_section:
+            sleep(5)
             runs.append(
                 submit_flowrun.submit(
                     flow_name=f"[SOFIMA] Warp Sections/{user}",
