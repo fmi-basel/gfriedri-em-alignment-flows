@@ -1,4 +1,5 @@
 from os.path import basename, join, splitext
+from time import sleep
 
 import numpy as np
 from parameter_config import FlowFieldEstimationConfig
@@ -165,6 +166,7 @@ def estimate_z_flow_fields_parallel(
 
     runs = []
     for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
+        sleep(15)
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",

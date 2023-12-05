@@ -1,5 +1,6 @@
 from glob import glob
 from os.path import join
+from time import sleep
 
 import numpy as np
 from parameter_config import MeshIntegrationConfig
@@ -97,6 +98,7 @@ def relax_meshes_flow(
     chunk_size = chunk_factor * mesh_integration.block_size
     runs = []
     for i, chunk_start in enumerate(range(0, len(section_dirs), chunk_size)):
+        sleep(15)
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Relax Meshes in Blocks/{user}",
