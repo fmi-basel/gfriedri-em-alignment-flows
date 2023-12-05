@@ -11,7 +11,7 @@ from connectomics.common import bounding_box
 from numcodecs import Blosc
 from ome_zarr.io import parse_url
 from parameter_config import MeshIntegrationConfig
-from s01_estimate_flow_fields import filter_sections, list_zarr_sections
+from s01_estimate_flow_fields import list_zarr_sections
 from sofima import map_utils, mesh
 
 
@@ -158,6 +158,8 @@ def mesh_optimization(
 
 def relax_meshes_in_blocks(
     section_dirs: list[str],
+    section_offset: int,
+    block_index_offset: int,
     output_dir: str,
     mesh_integration: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
@@ -175,8 +177,8 @@ def relax_meshes_in_blocks(
         logger.info(f"Optimize meshes in block [{start_name}:{end_name}].")
         mesh_optimization(
             section_dirs=section_dirs[start:end],
-            start_section=start,
-            block_index=block_index,
+            start_section=section_offset + start,
+            block_index=block_index_offset + block_index,
             map_zarr=map_zarr,
             stride=flow_stride,
             integration_config=mesh_integration,
@@ -253,15 +255,10 @@ def relax_meshes_cross_blocks(
 def relax_meshes(
     stitched_section_dir: str = "",
     output_dir: str = "",
-    start_section: int = 0,
-    end_section: int = 9,
     mesh_integration: MeshIntegrationConfig = MeshIntegrationConfig(),
     flow_stride: int = 40,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
 
     dummy_flow = np.load(glob(join(section_dirs[1], "final_flow_*.npy"))[0])
     create_map_storage(
@@ -273,6 +270,8 @@ def relax_meshes(
 
     relax_meshes_in_blocks(
         section_dirs=section_dirs,
+        section_offset=0,
+        block_index_offset=0,
         output_dir=output_dir,
         mesh_integration=mesh_integration,
         flow_stride=flow_stride,
@@ -297,8 +296,6 @@ if __name__ == "__main__":
     relax_meshes(
         stitched_section_dir=config["stitched_sections_dir"],
         output_dir=config["output_dir"],
-        start_section=config["start_section"],
-        end_section=config["end_section"],
         mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
         flow_stride=config["flow_stride"],
     )

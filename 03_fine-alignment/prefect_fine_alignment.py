@@ -150,33 +150,26 @@ def submit_flowrun(flow_name: str, parameters: dict, batch: int):
 def estimate_z_flow_fields_parallel(
     user: str = "",
     stitched_sections_dir: str = "",
-    start_section: int = 0,
-    end_section: int = 9,
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
     max_parallel_jobs: int = 10,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
 
     yx_size = get_yx_size(section_dirs, bin=1)
     get_run_logger().info(f"Computed yx_size = ({yx_size[0]}, {yx_size[1]}).")
 
-    n_sections = end_section - start_section
+    n_sections = len(section_dirs)
     batch_size = int(max(10, min(n_sections // max_parallel_jobs, 250)))
     n_jobs = n_sections // batch_size + 1
     batch_size = n_sections // n_jobs
 
     runs = []
-    for batch_number, i in enumerate(range(start_section, end_section, batch_size)):
+    for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",
                 parameters=dict(
-                    stitched_sections_dir=stitched_sections_dir,
-                    start_section=max(start_section, i - 1),
-                    end_section=min(i + batch_size, end_section),
+                    stitched_sections_dir=stitched_sections_dir[i : i + batch_size],
                     yx_size=yx_size,
                     ffe_conf=ffe_conf,
                 ),
