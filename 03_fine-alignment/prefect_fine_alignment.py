@@ -31,7 +31,7 @@ def section_name(dir: str) -> str:
     cache_result_in_memory=False,
 )
 def estimate_z_flow_fields(
-    section_dirs: str = "",
+    section_dirs: list[str] = [""],
     yx_size: tuple[int, int] = (10, 10),
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
