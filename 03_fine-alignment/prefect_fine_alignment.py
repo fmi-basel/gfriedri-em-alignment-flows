@@ -11,7 +11,6 @@ from prefect.tasks import task, task_input_hash
 from s01_estimate_flow_fields import (
     clean_flow,
     compute_final_flow,
-    filter_sections,
     get_yx_size,
     list_zarr_sections,
     load_section_data,
@@ -32,20 +31,11 @@ def section_name(dir: str) -> str:
     cache_result_in_memory=False,
 )
 def estimate_z_flow_fields(
-    stitched_sections_dir: str = "",
-    start_section: int = 0,
-    end_section: int = 9,
+    section_dirs: str = "",
     yx_size: tuple[int, int] = (10, 10),
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
     logger = get_run_logger()
-    section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs,
-        start_section=start_section,
-        end_section=end_section,
-    )
-    logger.info(f"Found {len(section_dirs)} sections.")
 
     mfc = flow_field.JAXMaskedXCorrWithStatsCalculator()
 
@@ -171,7 +161,7 @@ def estimate_z_flow_fields_parallel(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",
                 parameters=dict(
-                    stitched_sections_dir=section_dirs[i : i + batch_size],
+                    stitched_sections=section_dirs[i : i + batch_size + 1],
                     yx_size=yx_size,
                     ffe_conf=ffe_conf,
                 ),
