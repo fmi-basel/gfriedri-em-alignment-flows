@@ -171,7 +171,7 @@ def estimate_z_flow_fields_parallel(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",
                 parameters=dict(
-                    stitched_sections_dir=stitched_sections_dir[i : i + batch_size],
+                    stitched_sections_dir=section_dirs[i : i + batch_size],
                     yx_size=yx_size,
                     ffe_conf=ffe_conf,
                 ),
