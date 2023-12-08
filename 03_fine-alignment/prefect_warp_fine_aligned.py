@@ -96,7 +96,7 @@ def warp_fine_alignment(
             n_sections_to_process += 1
 
     n_sections = len(section_dirs)
-    batch_size = int(max(10, min(n_sections_to_process // max_parallel_jobs, 250)))
+    batch_size = int(max(2, min(n_sections_to_process // max_parallel_jobs, 250)))
     n_jobs = n_sections_to_process // batch_size + 1
     batch_size = n_sections_to_process // n_jobs
 
