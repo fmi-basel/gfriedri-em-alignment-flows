@@ -117,6 +117,7 @@ def mesh_optimization(
     for section in section_dirs:
         ff_path = glob(join(section, "final_flow_*.npy"))
         if len(ff_path) > 0:
+            logger.info(f"Loading final flow from {basename(section)}.")
             final_flow.append(np.load(ff_path[0]))
 
     final_flow = np.concatenate(final_flow, axis=1)
@@ -130,6 +131,7 @@ def mesh_optimization(
     x = np.zeros_like(solved[:, start_section : start_section + 1, ...])
     for z in range(0, len(section_dirs) - 1):
 
+        logger.info(f"z = {z}")
         prev = map_utils.compose_maps_fast(
             final_flow[:, z : z + 1, ...],
             origin,
@@ -139,18 +141,21 @@ def mesh_optimization(
             stride,
         )
         x = np.zeros_like(solved[:, start_section + z : start_section + z + 1, ...])
-        logger.info(f"Relaxing {z + 1}. mesh in block.")
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
         if z < len(section_dirs) - 2:
+            logger.info(f"Writing to main[{start_section + z + 1}].")
             solved[:, start_section + z + 1 : start_section + z + 2] = x
             inv_map[
                 :, start_section + z + 1 : start_section + z + 2
             ] = map_utils.invert_map(x, map_box, map_box, stride)
         else:
             if start_section + z + 1 == solved.shape[1] - 1:
+                logger.info(f"Writing to main[{start_section + z + 1}].")
                 solved[:, start_section + z + 1 : start_section + z + 2] = x
+
+            logger.info(f"Writing to cross_block[{block_index}].")
             cross_block_flow[:, block_index : block_index + 1] = x
             last_inv[
                 :, start_section + z + 1 : start_section + z + 2
@@ -169,7 +174,7 @@ def relax_meshes_in_blocks(
     store = parse_url(path=join(output_dir, "maps.zarr"), mode="w").store
     map_zarr: zarr.Group = zarr.group(store=store)
     for block_index, i in enumerate(
-        range(0, len(section_dirs), mesh_integration.block_size)
+        range(0, len(section_dirs) - 1, mesh_integration.block_size)
     ):
         start = i
         end = min(start + mesh_integration.block_size + 1, len(section_dirs))
