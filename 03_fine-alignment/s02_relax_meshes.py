@@ -114,7 +114,7 @@ def mesh_optimization(
         prefer_orig_order=integration_config.prefer_orig_order,
     )
     final_flow = []
-    for section in section_dirs:
+    for section in section_dirs[1:]:
         ff_path = glob(join(section, "final_flow_*.npy"))
         if len(ff_path) > 0:
             final_flow.append(np.load(ff_path[0]))

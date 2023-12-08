@@ -94,7 +94,8 @@ def relax_meshes_flow(
         block_size=mesh_integration.block_size,
     )
 
-    chunk_factor = 100 // mesh_integration.block_size
+    # chunk_factor = 100 // mesh_integration.block_size
+    chunk_factor = mesh_integration.block_size
     chunk_size = chunk_factor * mesh_integration.block_size
     runs = []
     for i, chunk_start in enumerate(range(0, len(section_dirs), chunk_size)):
