@@ -114,26 +114,27 @@ def mesh_optimization(
         prefer_orig_order=integration_config.prefer_orig_order,
     )
     final_flow = []
-    for section in section_dirs[1:]:
+    for section in section_dirs:
         ff_path = glob(join(section, "final_flow_*.npy"))
         if len(ff_path) > 0:
             final_flow.append(np.load(ff_path[0]))
 
     final_flow = np.concatenate(final_flow, axis=1)
+    logger.info(f"Final flow shape: {final_flow.shape}")
     origin = jnp.array([0.0, 0.0])
 
     solved = map_zarr["main"]
     inv_map = map_zarr["main_inv"]
     cross_block_flow = map_zarr["cross_block_flow"]
     last_inv = map_zarr["last_inv"]
-    for z in range(0, final_flow.shape[1]):
-        prev_solved = solved[:, start_section + z : start_section + z + 1, ...]
+    x = np.zeros_like(solved[:, start_section : start_section + 1, ...])
+    for z in range(0, len(section_dirs) - 1):
 
         prev = map_utils.compose_maps_fast(
             final_flow[:, z : z + 1, ...],
             origin,
             stride,
-            prev_solved,
+            x,
             origin,
             stride,
         )
@@ -142,7 +143,7 @@ def mesh_optimization(
         x, e_kin, num_steps = mesh.relax_mesh(x, prev, config)
         x = np.array(x)
         map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=x.shape[1:][::-1])
-        if z + 1 < final_flow.shape[1]:
+        if z < len(section_dirs) - 2:
             solved[:, start_section + z + 1 : start_section + z + 2] = x
             inv_map[
                 :, start_section + z + 1 : start_section + z + 2
@@ -171,7 +172,7 @@ def relax_meshes_in_blocks(
         range(0, len(section_dirs), mesh_integration.block_size)
     ):
         start = i
-        end = min(start + mesh_integration.block_size, len(section_dirs))
+        end = min(start + mesh_integration.block_size + 1, len(section_dirs))
         start_name = section_name(section_dirs[start])
         end_name = section_name(section_dirs[end - 1])
         logger.info(f"Optimize meshes in block [{start_name}:{end_name}].")

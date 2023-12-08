@@ -95,7 +95,7 @@ def relax_meshes_flow(
     )
 
     # chunk_factor = 100 // mesh_integration.block_size
-    chunk_factor = mesh_integration.block_size
+    chunk_factor = 1
     chunk_size = chunk_factor * mesh_integration.block_size
     runs = []
     for i, chunk_start in enumerate(range(0, len(section_dirs), chunk_size)):
@@ -104,7 +104,9 @@ def relax_meshes_flow(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Relax Meshes in Blocks/{user}",
                 parameters=dict(
-                    section_dirs=section_dirs[chunk_start : chunk_start + chunk_size],
+                    section_dirs=section_dirs[
+                        chunk_start : chunk_start + chunk_size + 1
+                    ],
                     section_offset=chunk_start,
                     block_index_offset=i,
                     output_dir=output_dir,
