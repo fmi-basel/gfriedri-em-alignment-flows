@@ -1,6 +1,6 @@
 # buchtimo
 ```shell
-prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name buchtimo -p SLURM -q buchtimo -sb github/gfriedri-em-alignment-flow-buchtimo --skip-upload -o 02_coarse-section-alignment/deployments/buchtimo-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-buchtimo-gpu
+prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name buchtimo -p SLURM -q buchtimo -sb github/gfriedri-em-alignment-flow-buchtimo --skip-upload -o 02_coarse-section-alignment/deployments/buchtimo-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-buchtimo-cpu
 
 
 prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_alignment --name buchtimo -p SLURM -q buchtimo -sb github/gfriedri-em-alignment-flow-buchtimo --skip-upload -o 02_coarse-section-alignment/deployments/buchtimo-coarse_alignment.yaml -ib process/gfriedri-em-alignment-buchtimo-orchestration
@@ -14,7 +14,7 @@ prefect deployment build 02_coarse-section-alignment/prefect_create_coarse_align
 
 # ganctoma
 ```shell
-prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 02_coarse-section-alignment/deployments/ganctoma-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-ganctoma-gpu
+prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 02_coarse-section-alignment/deployments/ganctoma-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-ganctoma-cpu
 
 
 prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_alignment --name ganctoma -p SLURM -q ganctoma -sb github/gfriedri-em-alignment-flows-ganctoma --skip-upload -o 02_coarse-section-alignment/deployments/ganctoma-coarse_alignment.yaml -ib process/gfriedri-em-alignment-ganctoma-orchestration
@@ -28,7 +28,7 @@ prefect deployment build 02_coarse-section-alignment/prefect_create_coarse_align
 
 # kappjoha
 ```shell
-prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 02_coarse-section-alignment/deployments/kappjoha-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-kappjoha-gpu
+prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_align_pairs --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 02_coarse-section-alignment/deployments/kappjoha-coarse_align_pairs.yaml -ib process/gfriedri-em-alignment-kappjoha-cpu
 
 
 prefect deployment build 02_coarse-section-alignment/prefect_coarse_alignment.py:coarse_alignment --name kappjoha -p SLURM -q kappjoha -sb github/gfriedri-em-alignment-flows-kappjoha --skip-upload -o 02_coarse-section-alignment/deployments/kappjoha-coarse_alignment.yaml -ib process/gfriedri-em-alignment-kappjoha-orchestration

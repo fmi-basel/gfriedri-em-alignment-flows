@@ -131,7 +131,7 @@ def coarse_alignment(
         end_section=end_section,
     )
 
-    batch_size = int(max(10, min(len(section_dirs) // max_parallel_jobs, 500)))
+    batch_size = int(max(10, min(len(section_dirs) // max_parallel_jobs, 50)))
     n_jobs = len(section_dirs) // batch_size + 1
     batch_size = len(section_dirs) // n_jobs
 
