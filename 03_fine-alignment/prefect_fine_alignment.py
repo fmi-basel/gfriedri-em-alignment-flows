@@ -156,7 +156,7 @@ def estimate_z_flow_fields_parallel(
 
     runs = []
     for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
-        sleep(15)
+        sleep(5)
         runs.append(
             submit_flowrun.submit(
                 flow_name=f"[SOFIMA] Estimate Z Flow-Fields/{user}",
