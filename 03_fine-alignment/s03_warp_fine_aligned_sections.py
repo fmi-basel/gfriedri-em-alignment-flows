@@ -14,7 +14,7 @@ from connectomics.volume import subvolume
 from numcodecs import Blosc
 from ome_zarr.format import CurrentFormat
 from ome_zarr.io import parse_url
-from s01_estimate_flow_fields import filter_sections, get_yx_size
+from s01_estimate_flow_fields import get_yx_size
 from scipy.interpolate import RegularGridInterpolator
 from sofima import map_utils
 from sofima.processor import maps
@@ -51,8 +51,7 @@ def list_zarr_sections(root_dir: str) -> list[str]:
 def create_zarr(
     output_dir: str,
     volume_name: str,
-    start_section: int,
-    end_section: int,
+    n_sections: int,
     yx_size: tuple[int, int],
     bin: int,
     n_levels: int = 1,
@@ -67,7 +66,7 @@ def create_zarr(
         downscale = 2**level
         # Downscale only in YX
         shape = (
-            end_section - start_section + 1,
+            n_sections,
             yx_size[0] // bin // downscale,
             yx_size[1] // bin // downscale,
         )
@@ -297,11 +296,11 @@ def warp_subvolume(
 
 def warp_sections(
     section_dirs: list[str],
+    warp_start_section: int,
+    warp_end_section: int,
     target_dir: str,
     yx_size: tuple[int, int],
     offset: int,
-    start_section: int,
-    end_section: int,
     blocks: list[tuple[int, int]],
     map_zarr_dir: str,
     flow_stride: int,
@@ -311,12 +310,11 @@ def warp_sections(
     map_zarr: zarr.Group = zarr.group(store=store)
 
     target_volume = zarr.group(store=parse_url(path=target_dir, mode="w").store)[0]
-    logger.info(f"Processing {len(section_dirs)} sections.")
-    for section_dir in section_dirs:
+    for i, section_dir in enumerate(section_dirs):
+
         sec_id = int(basename(section_dir).split("_")[0][1:])
-        logger.info(f"Warp section {sec_id}.")
-        if start_section <= sec_id <= end_section:
-            output_index = sec_id - offset
+        if warp_start_section <= sec_id <= warp_end_section:
+            logger.info(f"Warp section {sec_id}.")
             inv_map, box = reconcile_flow(
                 blocks=blocks,
                 main_map=map_zarr["main"],
@@ -325,8 +323,8 @@ def warp_sections(
                 cross_block_inv_map=map_zarr["cross_block_inv"],
                 last_inv_map=map_zarr["last_inv"],
                 stride=flow_stride,
-                start_section=start_section - start_section,
-                end_section=start_section + 1 - start_section,
+                start_section=i + offset,
+                end_section=i + offset + 1,
                 logger=logger,
             )
 
@@ -380,7 +378,7 @@ def warp_sections(
                             stride=flow_stride,
                             out_box=out_box,
                             target_volume=target_volume,
-                            z=output_index,
+                            z=offset + i,
                             out_start_y=y,
                             out_end_y=out_end_y,
                             out_start_x=x,
@@ -391,10 +389,10 @@ def warp_sections(
 
 def warp_fine_aligned_sections(
     stitched_sections_dir: str,
+    warp_start_section: int,
+    warp_end_section: int,
     output_dir: str,
     volume_name: str,
-    start_section: int,
-    end_section: int,
     block_size: int,
     map_zarr_dir: str,
     flow_stride: int,
@@ -403,9 +401,6 @@ def warp_fine_aligned_sections(
     zarr.blosc.use_threads = False
 
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
 
     blocks = []
     for i in range(0, len(section_dirs), block_size):
@@ -416,19 +411,18 @@ def warp_fine_aligned_sections(
     target_dir = create_zarr(
         output_dir=output_dir,
         volume_name=volume_name,
-        start_section=start_section,
-        end_section=end_section,
+        n_sections=len(section_dirs),
         yx_size=yx_size,
         bin=1,
     )
 
     warp_sections(
         section_dirs=section_dirs,
+        warp_start_section=warp_start_section,
+        warp_end_section=warp_end_section,
         target_dir=target_dir,
         yx_size=yx_size,
-        offset=start_section,
-        start_section=start_section,
-        end_section=end_section,
+        offset=0,
         blocks=blocks,
         map_zarr_dir=map_zarr_dir,
         flow_stride=flow_stride,
@@ -448,10 +442,10 @@ if __name__ == "__main__":
 
     warp_fine_aligned_sections(
         stitched_sections_dir=config["stitched_sections_dir"],
+        warp_start_section=config["warp_start_section"],
+        warp_end_section=config["warp_end_section"],
         output_dir=config["output_dir"],
         volume_name=config["volume_name"],
-        start_section=config["start_section"],
-        end_section=config["end_section"],
         block_size=config["block_size"],
         map_zarr_dir=config["map_zarr_dir"],
         flow_stride=config["flow_stride"],

@@ -141,14 +141,9 @@ def compute_final_flow(
 
 def estimate_flow_fields(
     stitched_section_dir: str = "",
-    start_section: int = 0,
-    end_section: int = 9,
     ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
-    section_dirs = filter_sections(
-        section_dirs=section_dirs, start_section=start_section, end_section=end_section
-    )
 
     yx_size = get_yx_size(section_dirs, bin=1)
 
@@ -233,7 +228,5 @@ if __name__ == "__main__":
 
     estimate_flow_fields(
         stitched_section_dir=config["stitched_sections_dir"],
-        start_section=config["start_section"],
-        end_section=config["end_section"],
         ffe_conf=FlowFieldEstimationConfig(**config["ffe_conf"]),
     )

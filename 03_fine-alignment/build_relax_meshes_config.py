@@ -107,21 +107,6 @@ def build_config():
         "Path to the stitched sections directory:"
     ).ask()
 
-    start_section = int(
-        questionary.text(
-            "start_section:",
-            default="0",
-            validate=lambda v: v.isdigit(),
-        ).ask()
-    )
-    end_section = int(
-        questionary.text(
-            "end_section:",
-            default="10",
-            validate=lambda v: v.isdigit(),
-        ).ask()
-    )
-
     mic = get_mesh_integration_config()
 
     flow_stride = int(
@@ -135,8 +120,6 @@ def build_config():
     config = dict(
         user=user_name,
         stitched_sections_dir=stitched_sections_dir,
-        start_section=start_section,
-        end_section=end_section,
         mesh_integration=mic.dict(),
         flow_stride=flow_stride,
         output_dir=output_dir,
