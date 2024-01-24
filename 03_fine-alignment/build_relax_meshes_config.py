@@ -80,7 +80,7 @@ def get_mesh_integration_config():
     block_size = int(
         questionary.text(
             "mesh_integration_config.block_size:",
-            default="50",
+            default="25",
             validate=lambda v: v.replace(".", "").isdigit(),
         ).ask()
     )
@@ -111,7 +111,7 @@ def build_config():
 
     flow_stride = int(
         questionary.text(
-            "flow_stride", default="40", validate=lambda v: v.isdigit()
+            "flow_stride", default="20", validate=lambda v: v.isdigit()
         ).ask()
     )
 

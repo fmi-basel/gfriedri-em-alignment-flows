@@ -15,7 +15,7 @@ def build_config():
         ).ask()
     )
     stride = int(
-        questionary.text("stride", default="40", validate=lambda v: v.isdigit()).ask()
+        questionary.text("stride", default="20", validate=lambda v: v.isdigit()).ask()
     )
     batch_size = int(
         questionary.text(

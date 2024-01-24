@@ -24,14 +24,14 @@ def build_config():
     flow_stride = int(
         questionary.text(
             "Flow stride:",
-            default="40",
+            default="20",
             validate=lambda x: x.isdigit() and int(x) > 0,
         ).ask()
     )
     block_size = int(
         questionary.text(
             "Block size:",
-            default="50",
+            default="25",
             validate=lambda x: x.isdigit() and int(x) > 0,
         ).ask()
     )
