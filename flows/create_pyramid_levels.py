@@ -130,4 +130,6 @@ def main(
 
 
 if __name__ == "__main__":
-    main(zarr_path="/path/to/ngff.zarr", max_layer=5, chunks=(1, 2744, 2744))
+    main(
+        zarr_path="/home/tibuch/Data/test-sem.zarr", max_layer=5, chunks=(1, 2744, 2744)
+    )
