@@ -1,5 +1,4 @@
 import argparse
-from glob import glob
 from os.path import dirname, join
 
 import yaml
@@ -51,32 +50,41 @@ def warp_tiles(output_dir: str, mesh_file: str, stride: int, warp_config: WarpCo
     return path
 
 
-def main(output_dir: str, section_dir: str, stride: int, warp_config: WarpConfig):
+def main(mesh_files: list[str], output_dir: str, stride: int, warp_config: WarpConfig):
     from s02_register_tiles import filter_ignore
 
-    mesh_files = glob(join(section_dir, "*", "meshes.npz"))
     mesh_files = filter_ignore(mesh_files, file_name="meshes.npz")
 
+    warped_tiles = []
     for mesh_file in tqdm(mesh_files):
-        warp_tiles(
-            output_dir=output_dir,
-            mesh_file=mesh_file,
-            stride=stride,
-            warp_config=warp_config,
+        warped_tiles.append(
+            warp_tiles(
+                output_dir=output_dir,
+                mesh_file=mesh_file,
+                stride=stride,
+                warp_config=warp_config,
+            )
         )
+
+    with open("warped_tiles.yaml", "w") as f:
+        yaml.safe_dump(warped_tiles, f)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="tile-stitching.config")
+    parser.add_argument("--meshes", type=str, default="meshes.yaml")
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
+    with open(args.meshes) as f:
+        mesh_files = yaml.safe_load(f)
+
     main(
+        mesh_files=mesh_files,
         output_dir=join(config["output_dir"], "stitched-sections"),
-        section_dir=join(config["output_dir"], "sections"),
         stride=config["mesh_integration_config"]["stride"],
         warp_config=WarpConfig(**config["warp_config"]),
     )
