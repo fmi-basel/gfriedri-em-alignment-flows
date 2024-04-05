@@ -13,14 +13,13 @@ process PARSEDATA {
 
     script:
     """
+    cd $launchDir
     python $baseDir/s01_parse_data.py --config $config
     """
 }
 
 process REGISTERTILES {
     label 'cpu'
-
-    maxForks 1
 
     errorStrategy = 'ignore'
 
@@ -34,14 +33,13 @@ process REGISTERTILES {
 
     script:
     """
+    cd $launchDir
     python $baseDir/s02_register_tiles.py --config $config --section_yaml_files $section_yaml_files
     """
 }
 
 process WARPTILES {
     label 'cpu'
-
-    maxForks 2
 
     errorStrategy = 'ignore'
 
@@ -54,6 +52,7 @@ process WARPTILES {
 
     script:
     """
+    cd $launchDir
     python $baseDir/s03_warp_tiles.py --config $config --meshes $meshes
     """
 }

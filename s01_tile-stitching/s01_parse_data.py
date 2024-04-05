@@ -93,6 +93,7 @@ def main(
     acquisition_conf: AcquisitionConfig = AcquisitionConfig(),
     start_section: int = 0,
     end_section: int = 10,
+    chunk_size: int = 10,
 ):
     section_yaml_files = parse_data(
         output_dir=output_dir,
@@ -104,7 +105,7 @@ def main(
         start_section=start_section,
         end_section=end_section,
     )
-    chunk_size = 2
+
     for chunk, i in enumerate(range(0, len(section_yaml_files), chunk_size)):
         section_yaml_files_chunk = section_yaml_files[i : i + chunk_size]
         with open(f"section_yaml_files_chunk_{chunk}.yaml", "w") as f:

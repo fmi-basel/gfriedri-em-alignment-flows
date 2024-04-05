@@ -354,7 +354,7 @@ def build_config():
         mesh_integration_config=dict(mesh_integration_config),
         registration_config=dict(registration_config),
         warp_config=dict(warp_config),
-        max_parallel_jobs=10,
+        chunk_size=10,
     )
 
     with open("tile-stitching.config", "w") as f:
