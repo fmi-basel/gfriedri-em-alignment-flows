@@ -18,7 +18,7 @@ process PARSEDATA {
 }
 
 process REGISTERTILES {
-    label 'cpu'
+    label 'gpu'
 
     errorStrategy = 'ignore'
 
