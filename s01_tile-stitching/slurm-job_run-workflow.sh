@@ -52,7 +52,7 @@ if [ -f "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/mamba.sh" ]; the
     . "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/mamba.sh"
 fi
 # <<< conda initialize <<<
-mamba run -p "$root_dir/infrastructure/envs/nf" nextflow run $root_dir/s01_tile-stitching/workflow.nf --config $(pwd)/config.yaml -profile slurm -with-report
+mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/gfriedri-em-alignment-flows/s01_tile-stitching/workflow.nf" --config $(pwd)/config.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
 
 ### END OF PUT YOUR CODE IN THIS SECTION
 
