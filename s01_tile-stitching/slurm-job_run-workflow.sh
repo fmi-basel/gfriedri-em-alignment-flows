@@ -36,20 +36,20 @@ root_dir="$(pwd)/../.."
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('../../infrastructure/apps/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+__conda_setup="$('../../infrastructure/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/conda.sh" ]; then
-        . "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/conda.sh"
+    if [ -f "$root_dir/infrastructure/miniforge3/etc/profile.d/conda.sh" ]; then
+        . "$root_dir/infrastructure/miniforge3/etc/profile.d/conda.sh"
     else
-        export PATH="$root_dir/infrastructure/apps/miniforge3/bin:$PATH"
+        export PATH="$root_dir/infrastructure/miniforge3/bin:$PATH"
     fi
 fi
 unset __conda_setup
 
-if [ -f "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/mamba.sh" ]; then
-    . "$root_dir/infrastructure/apps/miniforge3/etc/profile.d/mamba.sh"
+if [ -f "$root_dir/infrastructure/miniforge3/etc/profile.d/mamba.sh" ]; then
+    . "$root_dir/infrastructure/miniforge3/etc/profile.d/mamba.sh"
 fi
 # <<< conda initialize <<<
 mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/gfriedri-em-alignment-flows/s01_tile-stitching/workflow.nf" --config $(pwd)/config.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
