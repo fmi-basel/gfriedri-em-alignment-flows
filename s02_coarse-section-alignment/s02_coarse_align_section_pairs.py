@@ -1,9 +1,7 @@
 import argparse
 import json
 import os
-import re
-from os.path import basename, join
-from pathlib import Path
+from os.path import join
 
 import numpy as np
 import yaml
@@ -15,16 +13,6 @@ from tqdm import tqdm
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_FLAGS"] = "--xla_gpu_strict_conv_algorithm_picker=false"
-
-
-def filter_sections(section_dirs: list[str], start_section: int, end_section: int):
-    kept = []
-    for sec in section_dirs:
-        sec_idx = int(basename(sec).split("_")[0][1:])
-        if start_section <= sec_idx <= end_section:
-            kept.append(sec)
-
-    return kept
 
 
 def compute_extent(s1, s2):
@@ -122,19 +110,6 @@ def refine_coarse_alignment(s1, s2, s2_shift, coarse_bin):
     return tuple(np.mean(shifts_yx, axis=0).astype(int))
 
 
-def list_zarr_sections(root_dir: str) -> list[str]:
-    filename_re = re.compile(r"s[0-9]*_g[0-9]*.zarr")
-    files = []
-    root, dirs, _ = next(os.walk(root_dir))
-    for d in dirs:
-        m_filename = filename_re.fullmatch(d)
-        if m_filename:
-            files.append(str(Path(root).joinpath(d)))
-
-    files.sort(key=lambda v: int(basename(v).split("_")[0][1:]))
-    return files
-
-
 def compute_shift(current_section_dir: str, next_section_dir: str):
     current = zarr.Group(parse_url(current_section_dir).store)
     next = zarr.Group(parse_url(next_section_dir).store)
@@ -147,58 +122,33 @@ def compute_shift(current_section_dir: str, next_section_dir: str):
         json.dump(dict(shift_y=int(shift_y), shift_x=int(shift_x)), f)
 
 
-def load_shifts(section_dirs: list[str]):
-    shifts = []
-    for sec in section_dirs[1:]:
-        with open(join(sec, "shift_to_previous.json")) as f:
-            data = json.load(f)
-            shifts.append([data["shift_y"], data["shift_x"]])
+def main(stitched_section_dirs: list[str]):
 
-    return np.array(shifts)
-
-
-def get_padding_per_section(shifts):
-    cumulated_shifts = np.cumsum(shifts, axis=0)
-    cumulated_shifts = np.concatenate([np.array([[0, 0]]), cumulated_shifts], 0)
-    cumulated_padding = cumulated_shifts + np.abs(np.min(cumulated_shifts, axis=0))
-    return cumulated_padding
-
-
-def main(stitched_section_dir: str, start_section: int = 0, end_section: int = 10):
-    section_dirs = list_zarr_sections(
-        root_dir=stitched_section_dir,
-    )
-
-    section_dirs = filter_sections(
-        section_dirs=section_dirs,
-        start_section=start_section,
-        end_section=end_section,
-    )
-
-    for i in tqdm(range(len(section_dirs) - 1)):
+    processed_dirs = [stitched_section_dirs[0]]
+    for i in tqdm(range(len(stitched_section_dirs) - 1)):
         compute_shift(
-            current_section_dir=section_dirs[i], next_section_dir=section_dirs[i + 1]
+            current_section_dir=stitched_section_dirs[i],
+            next_section_dir=stitched_section_dirs[i + 1],
         )
+        processed_dirs.append(stitched_section_dirs[i + 1])
 
-    shifts = load_shifts(section_dirs)
-    paddings = get_padding_per_section(shifts)
-    for i in tqdm(range(len(section_dirs))):
-        with open(join(section_dirs[i], "coarse_stack_padding.json"), "w") as f:
-            json.dump(dict(shift_y=int(paddings[i, 0]), shift_x=int(paddings[i, 1])), f)
+    with open("processed_dirs.yaml", "w") as f:
+        yaml.safe_dump(processed_dirs, f)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=str, required=True, default="coarse-align.config"
+        "--stitched_section_dirs",
+        type=str,
+        required=True,
+        default="section_dirs_chunk_0.yaml",
     )
     args = parser.parse_args()
 
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
+    with open(args.stitched_section_dirs) as f:
+        stitched_section_dirs = yaml.safe_load(f)
 
     main(
-        stitched_section_dir=config["stitched_sections_dir"],
-        start_section=config["start_section"],
-        end_section=config["end_section"],
+        stitched_section_dirs=stitched_section_dirs,
     )
