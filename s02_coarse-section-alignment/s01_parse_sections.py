@@ -44,7 +44,7 @@ def main(
         end_section=end_section,
     )
 
-    chunk_size = 2
+    chunk_size = 20
     for chunk, i in enumerate(range(0, len(section_dirs), chunk_size)):
         start = max(0, i - 1)
         end = min(len(section_dirs), i + chunk_size)
