@@ -3,7 +3,7 @@
 params.config = "coarse-align.config"
 
 process PARSESECTIONS {
-    label 'cpu_short'
+    label 'cpu_small'
 
     input:
     path config
@@ -18,7 +18,7 @@ process PARSESECTIONS {
 }
 
 process COARSEALIGN {
-    label 'cpu'
+    label 'cpu_small'
 
     errorStrategy = 'ignore'
 
@@ -35,7 +35,7 @@ process COARSEALIGN {
 }
 
 process CREATEZARR {
-    label 'cpu_short'
+    label 'cpu_small'
 
     input:
     path config
