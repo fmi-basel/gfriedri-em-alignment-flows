@@ -1,9 +1,6 @@
 import argparse
 import json
-import os
-import re
 from os.path import basename, join, splitext
-from pathlib import Path
 
 import numpy as np
 import yaml
@@ -53,19 +50,6 @@ def filter_sections(section_dirs: list[str], start_section: int, end_section: in
             kept.append(sec)
 
     return kept
-
-
-def list_zarr_sections(root_dir: str) -> list[str]:
-    filename_re = re.compile(r"s[0-9]*_g[0-9]*.zarr")
-    files = []
-    root, dirs, _ = next(os.walk(root_dir))
-    for d in dirs:
-        m_filename = filename_re.fullmatch(d)
-        if m_filename:
-            files.append(str(Path(root).joinpath(d)))
-
-    files.sort(key=lambda v: int(basename(v).split("_")[0][1:]))
-    return files
 
 
 def load_section_data(section_dir: str, yx_size: tuple[int, int]) -> ArrayLike:
@@ -139,14 +123,11 @@ def compute_final_flow(
     )
 
 
-def estimate_flow_fields(
-    stitched_section_dir: str = "",
-    ffe_conf: FlowFieldEstimationConfig = FlowFieldEstimationConfig(),
+def main(
+    ffe_conf: FlowFieldEstimationConfig,
+    section_dirs: list[str],
+    yx_size: tuple[int, int],
 ):
-    section_dirs = list_zarr_sections(root_dir=stitched_section_dir)
-
-    yx_size = get_yx_size(section_dirs, bin=1)
-
     mfc = flow_field.JAXMaskedXCorrWithStatsCalculator()
 
     previous_section = load_section_data(
@@ -155,6 +136,7 @@ def estimate_flow_fields(
     )
     previous_name = splitext(basename(section_dirs[0]))[0]
 
+    flows = []
     for i in range(1, len(section_dirs)):
         current_section = load_section_data(
             section_dir=section_dirs[i],
@@ -210,10 +192,15 @@ def estimate_flow_fields(
         )
 
         name = f"final_flow_{previous_name}_to_{current_name}.npy"
-        np.save(join(section_dirs[i], name), final_flow)
+        output_path = join(section_dirs[i], name)
+        np.save(output_path, final_flow)
+        flows.append(output_path)
 
         previous_section = current_section
         previous_name = current_name
+
+    with open("flow_paths.yaml", "w") as f:
+        yaml.safe_dump(flows, f)
 
 
 if __name__ == "__main__":
@@ -221,12 +208,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config", type=str, default="fine_align_estimate_flow_fields.config"
     )
+    parser.add_argument("--section_dirs", type=str, default="section_dirs_chunk_0.yaml")
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
-    estimate_flow_fields(
-        stitched_section_dir=config["stitched_sections_dir"],
+    with open(args.section_dirs_chunk) as f:
+        chunk = yaml.safe_load(f)
+
+    main(
         ffe_conf=FlowFieldEstimationConfig(**config["ffe_conf"]),
+        section_dirs=chunk["section_dirs"],
+        yx_size=chunk["yx_size"],
     )
