@@ -22,6 +22,7 @@ process ESTIMATEFLOWFIELDS {
 
 
     input:
+    path config
     path section_dirs
 
     output:
