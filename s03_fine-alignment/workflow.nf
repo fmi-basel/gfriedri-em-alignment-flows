@@ -36,5 +36,5 @@ process ESTIMATEFLOWFIELDS {
 
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
-    flow_paths = ESTIMATEFLOWFIELDS(stitched_section_dirs.flatten())
+    flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
 }
