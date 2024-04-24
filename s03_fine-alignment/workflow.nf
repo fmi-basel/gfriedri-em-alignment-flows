@@ -3,7 +3,7 @@
 params.config = "fine-align.yaml"
 
 process PARSESECTIONS {
-    label 'cpu_small'
+    label 'cpu'
 
     input:
     path config
