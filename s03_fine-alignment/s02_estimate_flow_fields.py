@@ -214,7 +214,7 @@ if __name__ == "__main__":
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
-    with open(args.section_dirs_chunk) as f:
+    with open(args.section_dirs) as f:
         chunk = yaml.safe_load(f)
 
     main(
