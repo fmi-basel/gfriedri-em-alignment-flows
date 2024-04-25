@@ -7,15 +7,13 @@ import yaml
 import zarr
 from numcodecs import Blosc
 from ome_zarr.io import parse_url
-
-from flows.fine_alignment import MeshIntegrationConfig
+from parameter_config import MeshIntegrationConfig
 
 
 def main(
     stitched_section_dirs: list[str],
     output_dir: str,
     mesh_integration: MeshIntegrationConfig,
-    flow_stride: int,
 ):
     dummy_flow = np.load(glob(join(stitched_section_dirs[1], "final_flow_*.npy"))[0])
 
@@ -139,5 +137,4 @@ if __name__ == "__main__":
         stitched_section_dirs=stitched_section_dirs,
         output_dir=config["output_dir"],
         mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
-        flow_stride=config["flow_stride"],
     )
