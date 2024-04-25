@@ -18,14 +18,15 @@ def main(
 
     for batch_number, i in enumerate(range(0, len(section_dirs), batch_size)):
         section_dirs_chunk = section_dirs[i : i + batch_size + 1]
-        with open(f"section_dirs_chunk_{batch_number}.yaml", "w") as f:
-            yaml.safe_dump(
-                dict(
-                    section_dirs=section_dirs_chunk,
-                    yx_size=yx_size,
-                ),
-                f,
-            )
+        if len(section_dirs_chunk) > 1:
+            with open(f"section_dirs_chunk_{batch_number}.yaml", "w") as f:
+                yaml.safe_dump(
+                    dict(
+                        section_dirs=section_dirs_chunk,
+                        yx_size=yx_size,
+                    ),
+                    f,
+                )
 
 
 def list_zarr_sections(root_dir: str) -> list[str]:
