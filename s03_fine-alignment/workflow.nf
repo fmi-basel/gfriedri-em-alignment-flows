@@ -34,7 +34,24 @@ process ESTIMATEFLOWFIELDS {
     """
 }
 
+process PREPAREMESHRELAXATION {
+    label 'cpu'
+
+    input:
+    path config
+    path flow_paths
+
+    output:
+    path "mesh_relaxation_blocks_*.yaml"
+
+    script:
+    """
+    python $baseDir/s03_prepare_mesh_relaxation.py --config $config --flow_paths $flow_paths
+    """
+}
+
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
+    blocks = PREPAREMESHRELAXATION(params.config, flow_paths.collectFile())
 }
