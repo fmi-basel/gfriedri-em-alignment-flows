@@ -128,11 +128,20 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     with open(args.flow_paths) as f:
-
-        stitched_section_dirs = sorted(
+        flow_paths = sorted(
             list(set(yaml.safe_load(f))),
             key=lambda v: int(basename(dirname(v)).split("_")[0][1:]),
         )
+
+    stitched_section_dirs = [dirname(p) for p in flow_paths]
+    section, grid = basename(stitched_section_dirs[0]).split("_")
+    first_section = int(section[1:]) - 1
+    stitched_section_dirs = [
+        join(
+            dirname(stitched_section_dirs[0]),
+            f"s{str(first_section).zfill(len(section) - 1)}_{grid}",
+        ),
+    ] + stitched_section_dirs
 
     main(
         stitched_section_dirs=stitched_section_dirs,
