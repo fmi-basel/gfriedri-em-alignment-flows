@@ -1,6 +1,6 @@
 import argparse
 from glob import glob
-from os.path import dirname, join
+from os.path import basename, dirname, join
 
 import numpy as np
 import yaml
@@ -128,9 +128,10 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     with open(args.flow_paths) as f:
+
         stitched_section_dirs = sorted(
             list(set(yaml.safe_load(f))),
-            key=lambda v: int(dirname(v).split("_")[0][1:]),
+            key=lambda v: int(basename(dirname(v)).split("_")[0][1:]),
         )
 
     main(
