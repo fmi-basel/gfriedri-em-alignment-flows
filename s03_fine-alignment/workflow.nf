@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 
 params.config = "fine-align.yaml"
+params.rm_config = "relax-meshes.yaml"
 
 process PARSESECTIONS {
     label 'cpu'
@@ -53,5 +54,5 @@ process PREPAREMESHRELAXATION {
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
-    blocks = PREPAREMESHRELAXATION(params.config, flow_paths.collectFile())
+    blocks = PREPAREMESHRELAXATION(params.rm_config, flow_paths.collectFile())
 }
