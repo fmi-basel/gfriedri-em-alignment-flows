@@ -35,7 +35,7 @@ def main(
             section_offset=chunk_start,
             block_index_offset=i,
         )
-        with open(f"mesh_relaxtion_blocks_{i}.yaml", "w") as f:
+        with open(f"mesh_relaxation_blocks_{i}.yaml", "w") as f:
             yaml.safe_dump(block_relaxation_config, f, sort_keys=False)
 
 
