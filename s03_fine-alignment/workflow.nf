@@ -51,8 +51,25 @@ process PREPAREMESHRELAXATION {
     """
 }
 
+process RELAXBLOCKS {
+    label 'gpu'
+
+    input:
+    path config
+    path block_sections
+
+    output:
+    path "relaxed_meshes_in_blocks.yaml"
+
+    script:
+    """
+    python $baseDir/s04_relax_mesh_blocks.py --config $config --block_sections $block_sections
+    """
+}
+
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
     blocks = PREPAREMESHRELAXATION(params.rm_config, flow_paths.collectFile())
+    relaxed_blocks = RELAXBLOCKS(params.rm_config, blocks.flatten())
 }
