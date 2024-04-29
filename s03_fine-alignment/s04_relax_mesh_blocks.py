@@ -159,7 +159,7 @@ if __name__ == "__main__":
         section_dirs=blocks["section_dirs"],
         section_offset=blocks["section_offset"],
         block_index_offset=blocks["block_index_offset"],
-        map_path=config["map_path"],
+        map_path=blocks["map_path"],
         mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
         flow_stride=config["flow_stride"],
     )
