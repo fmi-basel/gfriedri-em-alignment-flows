@@ -10,9 +10,8 @@ import yaml
 import zarr
 from connectomics.common import bounding_box
 from ome_zarr.io import parse_url
+from parameter_config import MeshIntegrationConfig
 from sofima import map_utils, mesh
-
-from flows.fine_alignment import MeshIntegrationConfig
 
 
 def relax_meshes_in_blocks(
