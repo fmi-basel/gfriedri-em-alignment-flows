@@ -25,7 +25,7 @@ def main(
     )
 
     for i, chunk_start in enumerate(
-        range(0, len(stitched_section_dirs), mesh_integration.block_size)
+        range(0, len(stitched_section_dirs) - 1, mesh_integration.block_size)
     ):
         block_relaxation_config = dict(
             map_path=path,
