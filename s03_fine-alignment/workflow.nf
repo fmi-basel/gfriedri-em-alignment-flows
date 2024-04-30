@@ -100,6 +100,18 @@ process PREPAREWARPING {
     """
 }
 
+process WARPSECTIONS {
+    label 'cpu'
+
+    input:
+    path sections_for_warping
+
+    script:
+    """
+    python $baseDir/s07_warp_sections.py --config $sections_for_warping
+    """
+}
+
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
@@ -107,4 +119,5 @@ workflow {
     relaxed_blocks = RELAXBLOCKS(params.rm_config, blocks.flatten())
     map = RELAXCROSSBLOCKS(params.rm_config, relaxed_blocks.collectFile())
     sections_for_warping = PREPAREWARPING(params.wf_config, map)
+    WARPSECTIONS(sections_for_warping.flatten())
 }
