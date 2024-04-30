@@ -67,9 +67,26 @@ process RELAXBLOCKS {
     """
 }
 
+process RELAXCROSSBLOCKS {
+    label 'gpu'
+
+    input:
+    path config
+    path relaxed_blocks
+
+    output:
+    path "map.yaml"
+
+    script:
+    """
+    python $baseDir/s05_relax_cross_blocks.py --config $config --relaxed_blocks $relaxed_blocks
+    """
+}
+
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
     blocks = PREPAREMESHRELAXATION(params.rm_config, flow_paths.collectFile())
     relaxed_blocks = RELAXBLOCKS(params.rm_config, blocks.flatten())
+    map = RELAXCROSSBLOCKS(params.rm_config, relaxed_blocks.collectFile())
 }
