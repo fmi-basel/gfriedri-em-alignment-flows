@@ -135,7 +135,7 @@ if __name__ == "__main__":
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
-    with open(args.relaxed_blocks) as f:
+    with open(args.map) as f:
         map_path = yaml.safe_load(f)["map_path"]
 
     main(
