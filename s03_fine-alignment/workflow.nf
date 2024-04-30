@@ -96,7 +96,7 @@ process PREPAREWARPING {
 
     script:
     """
-    python $baseDir/s06_prepare_warping.py --config $wf_config --map $map
+    python $baseDir/s06_prepare_warping.py --config $config --map $map
     """
 }
 
