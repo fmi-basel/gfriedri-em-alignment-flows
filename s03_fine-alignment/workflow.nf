@@ -79,7 +79,7 @@ process RELAXCROSSBLOCKS {
 
     script:
     """
-    python $baseDir/s05_relax_cross_blocks.py --config $config --relaxed_blocks $relaxed_blocks
+    python $baseDir/s05_relax_mesh_cross_blocks.py --config $config --relaxed_blocks $relaxed_blocks
     """
 }
 
