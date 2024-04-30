@@ -50,7 +50,6 @@ def main(
                 stride=flow_stride,
                 start_section=i + offset,
                 end_section=i + offset + 1,
-                logger=logger,
             )
 
             chunk_shape = target_volume.chunks
@@ -73,7 +72,6 @@ def main(
                         section_dir=section_dir,
                         yx_start=(src_start_y, src_start_x),
                         yx_end=(src_end_y, src_end_x),
-                        logger=logger,
                     )[np.newaxis, np.newaxis]
 
                     sum = src_data.sum()
@@ -108,7 +106,6 @@ def main(
                             out_end_y=out_end_y,
                             out_start_x=x,
                             out_end_x=out_end_x,
-                            logger=logger,
                         )
 
 
