@@ -2,6 +2,7 @@
 
 params.config = "fine-align.yaml"
 params.rm_config = "relax-meshes.yaml"
+params.wf_config = "warp-final.yaml"
 
 process PARSESECTIONS {
     label 'cpu'
@@ -83,10 +84,27 @@ process RELAXCROSSBLOCKS {
     """
 }
 
+process PREPAREWARPING {
+    label 'cpu'
+
+    input:
+    path config
+    path map
+
+    output:
+    path "sections_for_warping_*.yaml"
+
+    script:
+    """
+    python $baseDir/s06_prepare_warping.py --config $wf_config --map $map
+    """
+}
+
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
     blocks = PREPAREMESHRELAXATION(params.rm_config, flow_paths.collectFile())
     relaxed_blocks = RELAXBLOCKS(params.rm_config, blocks.flatten())
     map = RELAXCROSSBLOCKS(params.rm_config, relaxed_blocks.collectFile())
+    sections_for_warping = PREPAREWARPING(params.wf_config, map)
 }
