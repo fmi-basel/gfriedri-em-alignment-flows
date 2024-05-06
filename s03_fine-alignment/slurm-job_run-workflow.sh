@@ -53,7 +53,7 @@ if [ -f "$root_dir/infrastructure/miniforge3/etc/profile.d/mamba.sh" ]; then
 fi
 # <<< conda initialize <<<
 export JAX_SKIP_CUDA_CONSTRAINTS_CHECK=1
-mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/gfriedri-em-alignment-flows/s03_fine-alignment/workflow.nf" --config $(pwd)/fine_alignment_config.yaml --warp_config $(pwd)/warp_config.yaml -profile slurm -with-report -resume
+mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/s03_fine-alignment/workflow.nf" --config $(pwd)/fine_alignment_config.yaml --warp_config $(pwd)/warp_config.yaml -profile slurm -with-report -resume
 
 ### END OF PUT YOUR CODE IN THIS SECTION
 
