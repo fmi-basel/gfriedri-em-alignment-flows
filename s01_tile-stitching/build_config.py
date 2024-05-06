@@ -354,7 +354,7 @@ def build_config():
         warp_config=dict(warp_config),
     )
 
-    with open("tile-stitching.config", "w") as f:
+    with open("tile_stitching_config.yaml", "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
 
