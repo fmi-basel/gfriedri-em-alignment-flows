@@ -316,7 +316,6 @@ def get_acquistion_config():
 
 
 def build_config():
-    user_name = questionary.text("User name:").ask()
     output_dir = questionary.path("Path to the output directory:").ask()
     acquisition_config = get_acquistion_config()
 
@@ -346,7 +345,6 @@ def build_config():
     os.makedirs(stitched_section_dir, exist_ok=True)
 
     config = dict(
-        user=user_name,
         output_dir=output_dir,
         acquisition_config=dict(acquisition_config),
         start_section=start_section,
@@ -354,7 +352,6 @@ def build_config():
         mesh_integration_config=dict(mesh_integration_config),
         registration_config=dict(registration_config),
         warp_config=dict(warp_config),
-        chunk_size=10,
     )
 
     with open("tile-stitching.config", "w") as f:

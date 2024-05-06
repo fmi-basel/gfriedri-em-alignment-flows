@@ -10,7 +10,6 @@ def build_config():
     ).ask()
 
     if config_option == "coarse-align":
-        user_name = questionary.text("User name:").ask()
         stitched_sections_dir = questionary.path(
             "Path to the stitched sections " "directory:"
         ).ask()
@@ -31,17 +30,14 @@ def build_config():
         )
 
         config = dict(
-            user=user_name,
             stitched_sections_dir=stitched_sections_dir,
             start_section=start_section,
             end_section=end_section,
-            max_parallel_jobs=10,
         )
 
         with open("coarse-align.config", "w") as f:
             yaml.safe_dump(config, f, sort_keys=False)
     elif config_option == "coarse-stack":
-        user_name = questionary.text("User name:").ask()
         stitched_sections_dir = questionary.path(
             "Path to the stitched sections " "directory:"
         ).ask()
@@ -70,14 +66,12 @@ def build_config():
         )
 
         config = dict(
-            user=user_name,
             stitched_sections_dir=stitched_sections_dir,
             start_section=start_section,
             end_section=end_section,
             output_dir=output_dir,
             volume_name=volume_name,
             bin=bin,
-            max_parallel_jobs=10,
         )
 
         with open("coarse-stack.config", "w") as f:
