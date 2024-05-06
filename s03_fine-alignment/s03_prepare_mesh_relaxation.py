@@ -116,7 +116,7 @@ def create_map_storage(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=str, required=True, default="fine-align.config"
+        "--config", type=str, required=True, default="fine_alignment_config.yaml"
     )
     parser.add_argument(
         "--flow_paths", type=str, required=True, default="flow_paths.yaml"
@@ -146,5 +146,5 @@ if __name__ == "__main__":
     main(
         stitched_section_dirs=stitched_section_dirs,
         output_dir=config["output_dir"],
-        mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
+        mesh_integration=MeshIntegrationConfig(**config["mi_conf"]),
     )

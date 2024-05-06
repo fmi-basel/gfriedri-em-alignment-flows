@@ -123,7 +123,12 @@ def create_zarr(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, default="warp-final.yaml")
+    parser.add_argument(
+        "--config", type=str, required=True, default="fine_alignment_config.yaml"
+    )
+    parser.add_argument(
+        "--warp_config", type=str, required=True, default="warp_config.yaml"
+    )
     parser.add_argument(
         "--map",
         type=str,
@@ -135,16 +140,19 @@ if __name__ == "__main__":
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
+    with open(args.warp_config) as f:
+        warp_config = yaml.safe_load(f)
+
     with open(args.map) as f:
         map_path = yaml.safe_load(f)["map_path"]
 
     main(
-        stitched_sections_dir=config["stitched_sections_dir"],
-        block_size=config["mesh_integration"]["block_size"],
-        output_dir=config["output_dir"],
-        volume_name=config["volume_name"],
-        warp_start_section=config["warp_start_section"],
-        warp_end_section=config["warp_end_section"],
+        stitched_sections_dir=warp_config["stitched_sections_dir"],
+        block_size=config["mi_conf"]["block_size"],
+        output_dir=warp_config["output_dir"],
+        volume_name=warp_config["volume_name"],
+        warp_start_section=warp_config["warp_start_section"],
+        warp_end_section=warp_config["warp_end_section"],
         map_zarr_dir=map_path,
-        flow_stride=config["flow_stride"],
+        flow_stride=config["ffe_conf"]["flow_stride"],
     )

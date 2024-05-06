@@ -77,7 +77,7 @@ if __name__ == "__main__":
         "--config",
         type=str,
         required=True,
-        default="fine-align.yaml",
+        default="fine_alignment_config.yaml",
     )
     args = parser.parse_args()
 
@@ -85,5 +85,5 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     main(
-        stitched_section_dir=config["stitched_section_dir"],
+        stitched_section_dir=config["stitched_sections_dir"],
     )

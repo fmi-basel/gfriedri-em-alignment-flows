@@ -205,9 +205,7 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", type=str, default="fine_align_estimate_flow_fields.config"
-    )
+    parser.add_argument("--config", type=str, default="fine_alignment_config.yaml")
     parser.add_argument("--section_dirs", type=str, default="section_dirs_chunk_0.yaml")
     args = parser.parse_args()
 

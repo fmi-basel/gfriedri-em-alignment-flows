@@ -139,7 +139,7 @@ def mesh_optimization(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=str, required=True, default="relax-meshes.yaml"
+        "--config", type=str, required=True, default="fine_alignment_config.yaml"
     )
     parser.add_argument(
         "--block_sections",
@@ -160,6 +160,6 @@ if __name__ == "__main__":
         section_offset=blocks["section_offset"],
         block_index_offset=blocks["block_index_offset"],
         map_path=blocks["map_path"],
-        mesh_integration=MeshIntegrationConfig(**config["mesh_integration"]),
-        flow_stride=config["flow_stride"],
+        mesh_integration=MeshIntegrationConfig(**config["mi_conf"]),
+        flow_stride=config["ffe_conf"]["stride"],
     )

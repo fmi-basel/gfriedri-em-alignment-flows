@@ -1,8 +1,7 @@
 #!/usr/bin/env nextflow
 
-params.config = "fine-align.yaml"
-params.rm_config = "relax-meshes.yaml"
-params.wf_config = "warp-final.yaml"
+params.config = "fine_alignment_config.yaml"
+params.warp_config = "warp_config.yaml"
 
 process PARSESECTIONS {
     label 'cpu'
@@ -115,9 +114,9 @@ process WARPSECTIONS {
 workflow {
     stitched_section_dirs = PARSESECTIONS(params.config)
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
-    blocks = PREPAREMESHRELAXATION(params.rm_config, flow_paths.collectFile())
-    relaxed_blocks = RELAXBLOCKS(params.rm_config, blocks.flatten())
-    map = RELAXCROSSBLOCKS(params.rm_config, relaxed_blocks.collectFile())
-    sections_for_warping = PREPAREWARPING(params.wf_config, map)
+    blocks = PREPAREMESHRELAXATION(params.config, flow_paths.collectFile())
+    relaxed_blocks = RELAXBLOCKS(params.config, blocks.flatten())
+    map = RELAXCROSSBLOCKS(params.config, relaxed_blocks.collectFile())
+    sections_for_warping = PREPAREWARPING(params.warp_config, map)
     WARPSECTIONS(sections_for_warping.flatten())
 }
