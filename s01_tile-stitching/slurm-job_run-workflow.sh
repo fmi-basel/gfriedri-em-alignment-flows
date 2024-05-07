@@ -36,8 +36,8 @@ root_dir="$(pwd)/../.."
 
 # >>> mamba initialize >>>
 # !! Contents within this block are managed by 'mamba init' !!
-export MAMBA_EXE='$root_dir/infrastructure/micromamba/bin/micromamba';
-export MAMBA_ROOT_PREFIX='$root_dir/infrastructure/micromamba';
+export MAMBA_EXE="$root_dir/infrastructure/micromamba/bin/micromamba";
+export MAMBA_ROOT_PREFIX="$root_dir/infrastructure/micromamba";
 __mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__mamba_setup"
