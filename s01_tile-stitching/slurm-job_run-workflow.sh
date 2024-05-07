@@ -46,7 +46,7 @@ else
 fi
 unset __mamba_setup
 # <<< mamba initialize <<<
-mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/s01_tile-stitching/workflow.nf" --config $(pwd)/tile_stitching_config.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
+mamba run -p "$root_dir/infrastructure/envs/nf" nextflow run "$root_dir/s01_tile-stitching/workflow.nf" --config $(pwd)/tile_stitching_config.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
 
 ### END OF PUT YOUR CODE IN THIS SECTION
 
