@@ -46,7 +46,7 @@ unset __mamba_setup
 # <<< mamba initialize <<<
 alias mamba=micromamba
 export JAX_SKIP_CUDA_CONSTRAINTS_CHECK=1
-mamba run -p "$root_dir/infrastructure/envs/nf" nextflow run "$root_dir/s03_fine-alignment/workflow.nf" --config $(pwd)/fine_alignment_config.yaml --warp_config $(pwd)/warp_config.yaml -profile slurm -with-report -resume
+micromamba run -p "$root_dir/infrastructure/envs/nf" nextflow run "$root_dir/s03_fine-alignment/workflow.nf" --config $(pwd)/fine_alignment_config.yaml --warp_config $(pwd)/warp_config.yaml -profile slurm -with-report -resume
 
 ### END OF PUT YOUR CODE IN THIS SECTION
 
