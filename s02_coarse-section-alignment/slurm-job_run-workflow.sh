@@ -46,6 +46,7 @@ else
 fi
 unset __mamba_setup
 # <<< mamba initialize <<<
+alias mamba=micromamba
 mamba run -p "$root_dir/infrastructure/envs/nf" nextflow run "$root_dir/s02_coarse-section-alignment/workflow.nf" --config $(pwd)/coarse-align.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
 
 ### END OF PUT YOUR CODE IN THIS SECTION
