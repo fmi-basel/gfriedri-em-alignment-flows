@@ -34,25 +34,19 @@ echo "[INFO] [$STARTDATE] [$$] Working directory: $(pwd)"
 
 root_dir="$(pwd)/../.."
 
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('$root_dir/infrastructure/miniforge3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+# >>> mamba initialize >>>
+# !! Contents within this block are managed by 'mamba init' !!
+export MAMBA_EXE="$root_dir/infrastructure/micromamba/bin/micromamba";
+export MAMBA_ROOT_PREFIX="$root_dir/infrastructure/micromamba";
+__mamba_setup="$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
+    eval "$__mamba_setup"
 else
-    if [ -f "$root_dir/infrastructure/miniforge3/etc/profile.d/conda.sh" ]; then
-        . "$root_dir/infrastructure/miniforge3/etc/profile.d/conda.sh"
-    else
-        export PATH="$root_dir/infrastructure/miniforge3/bin:$PATH"
-    fi
+    alias micromamba="$MAMBA_EXE"  # Fallback on help from mamba activate
 fi
-unset __conda_setup
-
-if [ -f "$root_dir/infrastructure/miniforge3/etc/profile.d/mamba.sh" ]; then
-    . "$root_dir/infrastructure/miniforge3/etc/profile.d/mamba.sh"
-fi
-# <<< conda initialize <<<
-mamba run -p "$root_dir/infrastructure/miniforge3/envs/nf" nextflow run "$root_dir/s02_coarse-section-alignment/workflow.nf" --config $(pwd)/coarse-align.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
+unset __mamba_setup
+# <<< mamba initialize <<<
+mamba run -p "$root_dir/infrastructure/envs/nf" nextflow run "$root_dir/s02_coarse-section-alignment/workflow.nf" --config $(pwd)/coarse-align.yaml -profile slurm -with-report -resume -disable-jobs-cancellation
 
 ### END OF PUT YOUR CODE IN THIS SECTION
 
