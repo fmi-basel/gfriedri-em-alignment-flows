@@ -1,5 +1,3 @@
-eval "$($(pwd)/infrastructure/miniforge3/bin/conda shell.bash hook)"
-
 export PIP_CACHE_DIR="$(pwd)/infrastructure/.PIP_CACHE"
 
 export NXF_OPTS="-Xms500M -Xmx2G"
