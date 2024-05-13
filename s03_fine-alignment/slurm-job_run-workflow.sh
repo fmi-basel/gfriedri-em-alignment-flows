@@ -32,7 +32,7 @@ echo "[INFO] [$STARTDATE] [$$] Working directory: $(pwd)"
 
 ### PUT YOUR CODE IN THIS SECTION
 
-$root_dir="$(pwd)/../.."
+root_dir="$(pwd)/../.."
 
 # >>> mamba initialize >>>
 # !! Contents within this block are managed by 'mamba init' !!
