@@ -1,7 +1,6 @@
 import questionary
 import yaml
-
-from .parameter_config import FlowFieldEstimationConfig, MeshIntegrationConfig
+from parameter_config import FlowFieldEstimationConfig, MeshIntegrationConfig
 
 
 def get_flow_field_estimation_config():
