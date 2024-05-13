@@ -22,7 +22,7 @@ def build_config():
         ).ask()
     )
 
-    output_dir = questionary.text("Output dir:").ask()
+    output_dir = questionary.path("Output dir:").ask()
     volume_name = questionary.text("Volume name:").ask()
     bin = int(
         questionary.text(
