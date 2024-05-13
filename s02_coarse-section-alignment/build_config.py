@@ -39,7 +39,7 @@ def build_config():
         bin=bin,
     )
 
-    with open("coarse-align.config", "w") as f:
+    with open("coarse-align.yaml", "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
 
