@@ -216,3 +216,7 @@ def main():
 
     with open("warp_config.yaml", "w") as f:
         yaml.safe_dump(warp_config, f, sort_keys=False)
+
+
+if __name__ == "__main__":
+    main()
