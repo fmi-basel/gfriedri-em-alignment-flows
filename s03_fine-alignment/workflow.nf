@@ -88,6 +88,7 @@ process PREPAREWARPING {
 
     input:
     path config
+    path warp_config
     path map
 
     output:
@@ -95,7 +96,7 @@ process PREPAREWARPING {
 
     script:
     """
-    python $baseDir/s06_prepare_warping.py --config $config --map $map
+    python $baseDir/s06_prepare_warping.py --config $config --warp_config $warp_config --map $map
     """
 }
 
