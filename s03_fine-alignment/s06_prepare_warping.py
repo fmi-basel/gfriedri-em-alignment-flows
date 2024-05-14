@@ -18,7 +18,7 @@ def main(
     warp_start_section: int,
     warp_end_section: int,
     map_zarr_dir: str,
-    flow_stride: int,
+    stride: int,
 ):
     section_dirs = list_zarr_sections(root_dir=stitched_sections_dir)
 
@@ -56,7 +56,7 @@ def main(
                         offset=i,
                         blocks=blocks,
                         map_zarr_dir=map_zarr_dir,
-                        flow_stride=flow_stride,
+                        stride=stride,
                     ),
                     f,
                 )
