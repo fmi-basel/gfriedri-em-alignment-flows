@@ -154,5 +154,5 @@ if __name__ == "__main__":
         warp_start_section=warp_config["warp_start_section"],
         warp_end_section=warp_config["warp_end_section"],
         map_zarr_dir=map_path,
-        flow_stride=config["ffe_conf"]["flow_stride"],
+        stride=config["ffe_conf"]["stride"],
     )

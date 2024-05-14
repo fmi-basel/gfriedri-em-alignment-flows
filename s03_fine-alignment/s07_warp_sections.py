@@ -26,7 +26,7 @@ def main(
     blocks: list[tuple[int, int]],
     warp_start_section: int,
     warp_end_section: int,
-    flow_stride: int,
+    stride: int,
     offset: int,
     yx_size: tuple[int, int],
 ):
@@ -47,7 +47,7 @@ def main(
                 cross_block_map=map_zarr["cross_block"],
                 cross_block_inv_map=map_zarr["cross_block_inv"],
                 last_inv_map=map_zarr["last_inv"],
-                stride=flow_stride,
+                stride=stride,
                 start_section=i + offset,
                 end_section=i + offset + 1,
             )
@@ -98,7 +98,7 @@ def main(
                             image_box=img_box,
                             coord_map=inv_map,
                             map_box=box,
-                            stride=flow_stride,
+                            stride=stride,
                             out_box=out_box,
                             target_volume=target_volume,
                             z=offset + i,
@@ -323,7 +323,7 @@ if __name__ == "__main__":
         blocks=config["blocks"],
         warp_start_section=config["warp_start_section"],
         warp_end_section=config["warp_end_section"],
-        flow_stride=config["flow_stride"],
+        stride=config["stride"],
         offset=config["offset"],
         yx_size=config["yx_size"],
     )
