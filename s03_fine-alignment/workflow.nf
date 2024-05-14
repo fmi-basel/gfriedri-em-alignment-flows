@@ -117,6 +117,6 @@ workflow {
     blocks = PREPAREMESHRELAXATION(params.config, flow_paths.collectFile())
     relaxed_blocks = RELAXBLOCKS(params.config, blocks.flatten())
     map = RELAXCROSSBLOCKS(params.config, relaxed_blocks.collectFile())
-    sections_for_warping = PREPAREWARPING(params.warp_config, map)
+    sections_for_warping = PREPAREWARPING(params.config, map)
     WARPSECTIONS(sections_for_warping.flatten())
 }
