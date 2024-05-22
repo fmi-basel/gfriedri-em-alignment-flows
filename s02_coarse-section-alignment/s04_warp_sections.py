@@ -23,7 +23,6 @@ def load_padding(section_dir: str) -> tuple[int, int]:
 def write_section(
     section_dir: str,
     out_z: int,
-    yx_size: tuple[int, int],
     bin: int,
     zarr_root: zarr.Group,
 ):
@@ -31,10 +30,7 @@ def write_section(
     current = zarr.Group(parse_url(section_dir).store)
     y_pad, x_pad = load_padding(section_dir)
     data = block_reduce(
-        current[0][
-            : yx_size[0] - y_pad,
-            : yx_size[1] - x_pad,
-        ],
+        current[0][:, :],
         block_size=bin,
         func=np.mean,
     ).astype(np.uint8)
@@ -65,7 +61,6 @@ def main(
         write_section(
             section_dir=chunk[i][1],
             out_z=chunk[i][0],
-            yx_size=zarr_root[0].shape[1:],
             bin=bin,
             zarr_root=zarr_root,
         )
