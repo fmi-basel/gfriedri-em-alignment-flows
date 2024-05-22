@@ -142,7 +142,7 @@ def main(
     with open("zarr_dir.yaml", "w") as f:
         yaml.safe_dump([empty_zarr_path], f)
 
-    for idx, i in enumerate(range(0, len(stitched_section_dirs) - 10, 10)):
+    for idx, i in enumerate(range(0, max(len(stitched_section_dirs) - 10, 1), 10)):
         with open(f"processed_chunks_{idx}.yaml", "w") as f:
             yaml.safe_dump(outputs[i : i + 10], f)
 
