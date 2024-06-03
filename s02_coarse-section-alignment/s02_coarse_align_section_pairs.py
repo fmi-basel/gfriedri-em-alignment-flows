@@ -38,7 +38,7 @@ def pad_target(target, extent):
 
 
 def compute_coarse_alignment(s1, s2):
-    bin = max(*s1[0].shape, *s2[0].shape) // 1024
+    bin = max(*s1[0].shape, *s2[0].shape) // 2048
 
     target = s1[0][::bin, ::bin]
     moving = s2[0][::bin, ::bin]
