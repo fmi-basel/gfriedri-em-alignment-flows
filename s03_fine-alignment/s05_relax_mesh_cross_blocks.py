@@ -21,8 +21,6 @@ def main(
     store = parse_url(path=map_path, mode="w").store
     map_zarr: zarr.Group = zarr.group(store=store)
     cross_block_flow = map_zarr["cross_block_flow"]
-    cross_block_map = map_zarr["cross_block"]
-    cross_block_inv_map = map_zarr["cross_block_inv"]
     main_map_size = map_zarr["main"].shape[1:][::-1]
     map_box = bounding_box.BoundingBox(start=(0, 0, 0), size=main_map_size)
     map2x_box = map_box.scale(0.5)
@@ -68,23 +66,23 @@ def main(
         xblk.append(x)
 
     xblk = np.concatenate(xblk, axis=1)
-    logger.info("Resample cross block map.")
-    cross_block_map[:, :, ...] = map_utils.resample_map(
-        xblk, map2x_box, map_box, flow_stride * 2, flow_stride
-    )
-    logger.info("Invert cross block map.")
-    cross_block_inv_map[:, :, ...] = map_utils.invert_map(
-        cross_block_map[:], map_box, map_box, flow_stride
+    map_zarr.create_dataset(
+        "relaxed_cross_block_flow",
+        data=xblk,
+        chunks=(1, 1) + xblk.shape[2:],
     )
 
-    with open("map.yaml", "w") as f:
-        yaml.safe_dump(
-            dict(
-                map_path=map_path,
-            ),
-            f,
-            sort_keys=False,
-        )
+    for i in range(x_block_flow.shape[1]):
+        with open(f"resample_and_invert_config_{i}.yaml", "w") as f:
+            yaml.safe_dump(
+                {
+                    "map_zarr_dir": map_path,
+                    "block_index": i,
+                    "stride": flow_stride,
+                },
+                f,
+                sort_keys=False,
+            )
 
 
 if __name__ == "__main__":

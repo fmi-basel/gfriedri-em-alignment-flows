@@ -75,11 +75,26 @@ process RELAXCROSSBLOCKS {
     path relaxed_blocks
 
     output:
-    path "map.yaml"
+    path "resample_and_invert_config_*.yaml"
 
     script:
     """
     python $baseDir/s05_relax_mesh_cross_blocks.py --config $config --relaxed_blocks $relaxed_blocks
+    """
+}
+
+process RESAMPLEANDINVERT {
+    label 'cpu'
+
+    input:
+    path config
+
+    output:
+    path "map_*.yaml"
+
+    script:
+    """
+    python $baseDir/s06_resample_and_invert_cross_block_map.py --config $config
     """
 }
 
@@ -96,7 +111,7 @@ process PREPAREWARPING {
 
     script:
     """
-    python $baseDir/s06_prepare_warping.py --config $config --warp_config $warp_config --map $map
+    python $baseDir/s07_prepare_warping.py --config $config --warp_config $warp_config --map $map
     """
 }
 
@@ -108,7 +123,7 @@ process WARPSECTIONS {
 
     script:
     """
-    python $baseDir/s07_warp_sections.py --config $sections_for_warping
+    python $baseDir/s08_warp_sections.py --config $sections_for_warping
     """
 }
 
@@ -117,7 +132,9 @@ workflow {
     flow_paths = ESTIMATEFLOWFIELDS(params.config, stitched_section_dirs.flatten())
     blocks = PREPAREMESHRELAXATION(params.config, flow_paths.collectFile())
     relaxed_blocks = RELAXBLOCKS(params.config, blocks.flatten())
-    map = RELAXCROSSBLOCKS(params.config, relaxed_blocks.collectFile())
+    resample_and_invert_configs = RELAXCROSSBLOCKS(params.config, relaxed_blocks.collectFile())
+    maps = RESAMPLEANDINVERT(resample_and_invert_configs.flatten())
+    map = maps.collect().map { it[0] }
     sections_for_warping = PREPAREWARPING(params.config, params.warp_config, map)
     WARPSECTIONS(sections_for_warping.flatten())
 }
