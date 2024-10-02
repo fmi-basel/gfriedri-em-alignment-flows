@@ -42,13 +42,14 @@ def main(
         if warp_start_section <= start_id <= warp_end_section:
             n_sections_to_process += 1
 
-    for chunk, i in enumerate(range(0, len(section_dirs), 20)):
+    chunk_size = 2
+    for chunk, i in enumerate(range(0, len(section_dirs), chunk_size)):
         start_id = int(basename(section_dirs[i]).split("_")[0][1:])
-        if warp_start_section - 20 <= start_id <= warp_end_section:
+        if warp_start_section - chunk_size <= start_id <= warp_end_section:
             with open(f"sections_for_warping_{chunk}.yaml", "w") as f:
                 yaml.safe_dump(
                     dict(
-                        section_dirs=section_dirs[i : i + 20],
+                        section_dirs=section_dirs[i : i + chunk_size],
                         warp_start_section=warp_start_section,
                         warp_end_section=warp_end_section,
                         target_dir=target_dir,
