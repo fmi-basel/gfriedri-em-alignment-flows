@@ -134,7 +134,7 @@ workflow {
     relaxed_blocks = RELAXBLOCKS(params.config, blocks.flatten())
     resample_and_invert_configs = RELAXCROSSBLOCKS(params.config, relaxed_blocks.collectFile())
     maps = RESAMPLEANDINVERT(resample_and_invert_configs.flatten())
-    map = maps.collect().map { it[0] }
+    map = maps.collect(sort=true).map { it[0] }
     sections_for_warping = PREPAREWARPING(params.config, params.warp_config, map)
     WARPSECTIONS(sections_for_warping.flatten())
 }
