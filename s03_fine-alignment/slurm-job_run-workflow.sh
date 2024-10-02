@@ -6,7 +6,7 @@
 #SBATCH --partition=orchestration
 #SBATCH --oversubscribe
 #SBATCH --mem=2GB
-#SBATCH --time=120:00:00
+#SBATCH --time=192:00:00
 if [ -z "$1" ]; then
         echo "[ERROR] [$(date -Iseconds)] [$$] SLURM account not provided."
         exit 1
